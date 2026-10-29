@@ -32,6 +32,16 @@ host draws on the projector, players tap to mark, live leaderboard.
 | `/review` | Host | All 36 squares with tile text and captions, printable. Needs the host key. |
 | `/tents?tables=10` | Host | Printable table cards with a QR per table. |
 
+## Offline POC (one HTML file)
+
+`poc/ETI Bingo POC.html` is the whole game in one file: double-click to open it in Edge or Chrome.
+The host screen and a phone sit side by side, bot players fill the room, and nothing is saved
+(Start over = reload). It needs internet only for fonts. Rebuild after code changes:
+
+```bash
+node tools/build-poc.mjs
+```
+
 ## Run locally
 
 ```bash

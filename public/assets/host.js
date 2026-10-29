@@ -266,7 +266,7 @@ async function openMore() {
   let players = [];
   try { players = (await api('host-players', {}, hostKey)).players; } catch (e) { flash(e.message); }
   modal(`<h2>Game settings</h2>
-    <div class="row"><a href="/review" target="_blank">Review all questions</a> &middot; <a href="/tents?tables=${S.tables}" target="_blank">Print table QR tents</a> &middot; <a href="/host?stage=1" target="_blank">Stage-only view</a></div>
+    <div class="row"><a href="/review" target="_blank">Review all squares</a> &middot; <a href="/tents?tables=${S.tables}" target="_blank">Print table QR tents</a> &middot; <a href="/host?stage=1" target="_blank">Stage-only view</a></div>
     <div class="row">Tables: <input id="tabs" type="number" min="1" max="30" value="${S.tables}" style="width:80px"><button id="saveTabs">Save</button></div>
     <div class="row">Winners: ${[1, 2, 3].map((r) => S.wins[r] ? `<button class="danger" data-clear="${r}">Clear R${r}: ${esc(S.wins[r].name)}</button>` : `<span style="color:var(--muted)">R${r}: none</span>`).join(' ')}</div>
     <h2 style="font-size:20px;margin-top:14px">Players (${players.length})</h2>
