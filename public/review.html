@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="robots" content="noindex">
-<title>ETI Bingo Question Review</title>
+<title>ETI Bingo Squares</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@700;800&family=DM+Sans:opsz,wght@9..40,400;9..40,700&display=swap" rel="stylesheet">
@@ -38,17 +38,14 @@
     try {
       const { squares } = await api('host-content', {}, key);
       localStorage.setItem('etibingo:hostkey', key);
-      app.innerHTML = `<h1>ETI <span>Bingo</span> question review</h1>
-        <p class="lead">24 squares, two questions each. The correct answer is in green; options are shuffled on screen. Second-chance questions are used when a missed square is drawn again. <a class="noprint" href="javascript:print()">Print</a></p>
-        ${squares.map((s, n) => `<div class="sq"><h2>${n + 1}. ${esc(s.label)}</h2>
-          ${s.qs.map((q, i) => `<div class="q"><div class="lab">${i ? 'Second chance' : 'First draw'}</div><p>${esc(q.q)}</p>
-            <ol type="A">${q.options.map((o, j) => `<li class="${j === q.a ? 'ok' : ''}">${esc(o)}</li>`).join('')}</ol>
-            <div class="fact">Reveal: ${esc(q.fact)}</div></div>`).join('')}</div>`).join('')}`;
+      app.innerHTML = `<h1>ETI <span>Bingo</span> squares</h1>
+        <p class="lead">${squares.length} squares in the bag. Each card gets 24 of them in a random order. The caption shows on the big screen when a square is called. <a class="noprint" href="javascript:print()">Print</a></p>
+        ${squares.map((s, n) => `<div class="sq"><h2>${n + 1}. ${esc(s.label)}</h2><div class="q"><div class="lab">Card tile</div><p>${esc(s.tile.replace(/­/g, ""))}</p><div class="fact">Caption: ${esc(s.caption)}</div></div></div>`).join("")}`;
     } catch (e) { gate(e.message); }
   }
   function gate(err = '') {
-    app.innerHTML = `<div class="gate"><h1>ETI <span>Bingo</span></h1><p class="lead">Host key required to see answers.</p>
-      <input id="k" type="password" placeholder="Host key"><button id="go">Show questions</button><p style="color:var(--bad)">${esc(err)}</p></div>`;
+    app.innerHTML = `<div class="gate"><h1>ETI <span>Bingo</span></h1><p class="lead">Host key required.</p>
+      <input id="k" type="password" placeholder="Host key"><button id="go">Show squares</button><p style="color:var(--bad)">${esc(err)}</p></div>`;
     document.getElementById('go').onclick = () => show(document.getElementById('k').value.trim());
   }
   const saved = localStorage.getItem('etibingo:hostkey');

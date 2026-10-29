@@ -4,8 +4,7 @@ const params = new URLSearchParams(location.search);
 const stageOnly = params.get('stage') === '1';
 let hostKey = localStorage.getItem('etibingo:hostkey') || '';
 let S = null, view = 'auto', stageKey = '', muted = localStorage.getItem('etibingo:mute') === '1';
-let seenWins = null, winnerUp = false, landed = {};
-const K = ['A', 'B', 'C', 'D'];
+let seenWins = null, winnerUp = false, auto = false, autoSecs = 15, autoBusy = false;
 const playUrl = location.origin + '/';
 
 $('#logo').innerHTML = LOGO;
@@ -29,8 +28,6 @@ function tone(freq, dur = 0.12, type = 'sine', gain = 0.12, when = 0) {
 const sfx = {
   tick: () => tone(1400, 0.03, 'square', 0.04),
   land: () => { tone(523, 0.18, 'triangle', 0.18); tone(784, 0.3, 'triangle', 0.18, 0.12); },
-  beep: () => tone(880, 0.08, 'sine', 0.1),
-  reveal: () => { tone(659, 0.15, 'triangle', 0.16); tone(988, 0.35, 'triangle', 0.16, 0.14); },
   bingo: () => [523, 659, 784, 1047, 784, 1047].forEach((f, i) => tone(f, 0.22, 'triangle', 0.2, i * 0.13)),
 };
 
@@ -78,20 +75,22 @@ function askKey(err = '') {
 // ---------------------------------------------------------------- stage
 function phase() {
   const d = S && S.current;
-  const t = now();
   if (view === 'lobby' || !d) return 'lobby';
   if (view === 'board') return 'board';
-  if (t < d.at) return 'spin';
-  if (t < d.closes) return 'question';
-  return S.reveal && S.reveal.id === d.id ? 'reveal' : 'timesup';
+  if (now() < d.at || !d.label) return 'spin';
+  return 'called';
+}
+
+function recentCalls(n) {
+  return S.called.slice(-n - 1, -1).reverse().map((sq) => S.labels[sq]);
 }
 
 function renderStage() {
   const p = phase();
   const d = S.current;
-  const key = `${p}:${d ? d.id : ''}:${d && d.q ? 1 : 0}:${p === 'lobby' ? S.players : ''}:${p === 'board' ? JSON.stringify(S.top) : ''}`;
+  const key = [p, d ? d.id : '', p === 'lobby' ? S.players : '', p === 'board' ? JSON.stringify(S.top) : '', p === 'called' ? d.onCards + '/' + S.players : ''].join('|');
   if (key === stageKey) return tickStage(p);
-  const prev = stageKey.split(':')[0];
+  const prev = stageKey.split('|');
   stageKey = key;
   const st = $('#stage');
   if (p === 'lobby') {
@@ -104,59 +103,38 @@ function renderStage() {
         <div class="names" id="names"></div></div></div>`;
     loadNames();
   } else if (p === 'board') {
-    const goal = S.goal;
     st.innerHTML = `<div class="board"><div class="eyebrow">Round ${S.round} &middot; ${esc(S.goalLabel)}</div><h2>Leaderboard</h2>
-      <ol>${S.top.map((r, i) => `<li><span class="r">${i + 1}</span><span class="n">${esc(r.name)}<small>Table ${r.table}${r.won ? ` · won R${r.won}` : ''}</small></span>
-        <span class="togo">${r.won ? 'Won R' + r.won : r.toGo === 0 ? 'BINGO' : `${r.toGo} to go`}</span></li>`).join('')}</ol></div>`;
-    void goal;
+      <ol>${S.top.map((r, i) => `<li><span class="r">${i + 1}</span><span class="n">${esc(r.name)}<small>Table ${r.table}</small></span>
+        <span class="togo">${r.won ? 'Won R' + r.won : r.toGo === 0 ? 'BINGO' : r.toGo + ' to go'}</span></li>`).join('')}</ol></div>`;
   } else if (p === 'spin') {
-    st.innerHTML = `<div class="spin"><div class="eyebrow">Draw ${d.n}${d.second ? ' &middot; Second chance' : ''}</div><div class="reel" id="reel">&nbsp;</div></div>`;
+    st.innerHTML = `<div class="spin"><div class="eyebrow">Draw ${d.n}</div><div class="reel" id="reel">&nbsp;</div></div>`;
   } else {
-    const q = d.q ? d : null;
-    const rev = p === 'reveal' ? S.reveal : null;
-    if (p === 'question' && prev === 'spin') sfx.land();
-    if (rev && !landed[d.id]) { landed[d.id] = true; sfx.reveal(); }
-    st.innerHTML = `
-      <div class="qhead"><span class="sqchip">${esc(d.label)}</span><span class="tag2">Draw ${d.n}</span>${d.second ? '<span class="tag2" style="border-color:var(--amber);color:var(--amber)">Second chance</span>' : ''}
-        <div class="ring" id="ring"><svg viewBox="0 0 36 36"><circle cx="18" cy="18" r="16" fill="none" stroke="rgba(255,255,255,.12)" stroke-width="3"/><circle id="arc" cx="18" cy="18" r="16" fill="none" stroke="#FFA000" stroke-width="3" stroke-linecap="round" stroke-dasharray="100.5" stroke-dashoffset="0"/></svg><b id="secs"></b></div></div>
-      <div class="question">${esc(q ? q.q : '')}</div>
-      <div class="opts">${(d.options || []).map((o, i) => `<div class="opt ${rev ? (i === rev.answer ? 'right' : 'dim') : ''}"><span class="k">${K[i]}</span><span>${esc(o)}</span></div>`).join('')}</div>
-      ${rev
-        ? `<div class="meter"><span>${rev.correct} of ${rev.answered} got it right</span><div class="bar"><i style="width:${rev.answered ? Math.round((rev.correct / rev.answered) * 100) : 0}%"></i></div><span>${rev.answered ? Math.round((rev.correct / rev.answered) * 100) : 0}%</span></div><div class="fact">${esc(rev.fact)}</div>`
-        : `<div class="meter"><span id="answered"></span><div class="bar"><i id="ansbar" style="width:0%"></i></div></div>`}`;
+    const fresh = prev[0] === 'spin' && prev[1] === d.id;
+    if (fresh) sfx.land();
+    const recent = recentCalls(5);
+    st.innerHTML = `<div class="callview">
+      <div class="eyebrow">Draw ${d.n} &middot; Just called</div>
+      <div class="bigcall ${fresh ? 'land' : ''}">${esc(d.label)}</div>
+      <div class="caption">${esc(d.caption || '')}</div>
+      <div class="oncards"><b>${d.onCards}</b> of ${S.players} cards have it. Tap it to mark it!</div>
+      ${recent.length ? `<div class="recent"><span>Earlier</span>${recent.map((l) => `<i>${esc(l)}</i>`).join('')}</div>` : ''}
+    </div>`;
   }
   tickStage(p);
 }
 
-let lastSec = null, reelI = 0, reelSlow = 0;
+let reelI = 0, reelSlow = 0;
 function tickStage(p) {
   const d = S.current;
-  if (p === 'spin') {
-    const left = d.at - now();
-    const r = $('#reel');
-    reelSlow++;
-    const every = left > 2000 ? 1 : left > 1000 ? 2 : 4;
-    if (r && reelSlow % every === 0) {
-      reelI = (reelI + 1) % S.labels.length;
-      r.textContent = S.labels[reelI];
-      sfx.tick();
-    }
-  }
-  if (p === 'question' || p === 'timesup' || p === 'reveal') {
-    const total = d.closes - d.at, left = Math.max(0, d.closes - now());
-    const arc = $('#arc');
-    if (arc) arc.setAttribute('stroke-dashoffset', String(100.5 * (1 - left / total)));
-    const sec = Math.ceil(left / 1000);
-    const secs = $('#secs');
-    if (secs) secs.textContent = p === 'question' ? sec : '0';
-    $('#ring') && $('#ring').classList.toggle('low', left < 10000);
-    if (p === 'question' && sec !== lastSec && sec <= 5 && sec > 0) sfx.beep();
-    lastSec = sec;
-    const a = $('#answered');
-    if (a) {
-      a.textContent = `${d.answered} of ${S.players} answered`;
-      $('#ansbar').style.width = (S.players ? Math.round((d.answered / S.players) * 100) : 0) + '%';
-    }
+  if (p !== 'spin') return;
+  const left = d.at - now();
+  const r = $('#reel');
+  reelSlow++;
+  const every = left > 2000 ? 1 : left > 1000 ? 2 : 4;
+  if (r && reelSlow % every === 0) {
+    reelI = (reelI + 1) % S.labels.length;
+    r.textContent = S.labels[reelI];
+    sfx.tick();
   }
 }
 
@@ -174,10 +152,10 @@ function renderChrome() {
     <span class="pill amber">Round ${S.round} &middot; ${esc(S.goalLabel)}</span>
     <span class="pill">${S.players} players</span>
     <span class="pill">${S.drawCount} drawn</span>`;
-  const now_ = S.current && now() < S.current.closes ? S.current.sq : null;
+  const now_ = S.current ? S.current.sq : null;
   const called = new Set(S.called);
   $('#called').innerHTML = S.tiles.map((l, i) => `<div class="${i === now_ ? 'now' : called.has(i) ? 'on' : ''}">${esc(l)}</div>`).join('');
-  $('#calledN').textContent = `${S.called.length}/24`;
+  $('#calledN').textContent = `${S.called.length}/${S.labels.length}`;
   $('#goalS').textContent = S.goalLabel;
   $('#lb').innerHTML = S.top.slice(0, 6).map((r, i) => `<li><span class="r">${i + 1}</span><span class="n">${esc(r.name)}<small>T${r.table}</small></span><span class="g ${r.toGo === 1 && !r.won ? 'one' : ''}">${r.won ? 'Won R' + r.won : r.toGo === 0 ? 'BINGO' : r.toGo + ' to go'}</span></li>`).join('')
     || '<li style="grid-template-columns:1fr;color:#9fb2d4">Waiting for players</li>';
@@ -195,10 +173,11 @@ function checkWins() {
 }
 function showWinner(r, w) {
   const el = $('#winner');
-  el.innerHTML = `<div class="eyebrow">Round ${r} &middot; ${esc(({ 1: 'Any line', 2: 'Two lines', 3: 'Blackout race' })[r])}</div>
+  el.innerHTML = `<div class="eyebrow">Round ${r} &middot; ${esc(({ 1: 'Any line', 2: 'Two lines', 3: 'Full card' })[r])}</div>
     <div class="big">BINGO!</div><div class="who">${esc(w.name)}</div><div class="meta">Table ${w.table}</div>
     <div class="hintx">Click or press Enter to continue</div>`;
   el.classList.add('show'); winnerUp = true;
+  if (auto) { auto = false; flash('Auto-draw paused for the winner'); }
   confetti(document.body, 180);
   sfx.bingo();
 }
@@ -209,12 +188,12 @@ function renderDock() {
   const dock = $('#dock');
   if (stageOnly) { dock.classList.add('hide'); return; }
   document.body.classList.toggle('docked', !dock.classList.contains('hide'));
-  const open = S && S.current && now() < S.current.closes;
+  const spinning = S && S.current && now() < S.current.at;
   dock.innerHTML = `
-    <button class="primary" data-a="draw" ${open ? 'disabled' : ''}>Draw<kbd>D</kbd></button>
-    <button data-a="second" ${open ? 'disabled' : ''}>Second chance<kbd>S</kbd></button>
-    <button data-a="close" ${open ? '' : 'disabled'}>End timer<kbd>E</kbd></button>
-    <select id="secsSel" title="Challenge timer">${[60, 45, 30, 20].map((s) => `<option value="${s}" ${S && S.seconds === s ? 'selected' : ''}>${s}s timer</option>`).join('')}</select>
+    <button class="primary" data-a="draw" ${spinning ? 'disabled' : ''}>Draw<kbd>D</kbd></button>
+    <button data-a="autoToggle" class="${auto ? 'on' : ''}">Auto-draw ${auto ? 'on' : 'off'}<kbd>A</kbd></button>
+    <select id="autoSel" title="Auto-draw pace">${[10, 15, 20, 30].map((s) => `<option value="${s}" ${autoSecs === s ? 'selected' : ''}>every ${s}s</option>`).join('')}</select>
+    <button data-a="undo">Undo draw</button>
     <span class="sep"></span>
     <button data-a="auto" class="${view === 'auto' ? 'on' : ''}">Game<kbd>G</kbd></button>
     <button data-a="board" class="${view === 'board' ? 'on' : ''}">Leaderboard<kbd>L</kbd></button>
@@ -227,32 +206,36 @@ function renderDock() {
     <button data-a="more">More</button>
     <button data-a="mute">${muted ? 'Sound off' : 'Sound on'}</button>
     <button data-a="hide" title="Hide dock (H)">Hide<kbd>H</kbd></button>`;
-  $('#secsSel').addEventListener('change', (e) => host('host-settings', { seconds: e.target.value }).then(() => flash(`Timer set to ${e.target.value} seconds`)));
+  $('#autoSel').addEventListener('change', (e) => { autoSecs = parseInt(e.target.value, 10); flash(`Auto-draw every ${autoSecs} seconds`); });
 }
 let dockSig = '';
 function maybeDock() {
-  const open = S && S.current && now() < S.current.closes;
-  const sig = `${open}:${view}:${S && S.round}:${S && S.seconds}:${muted}`;
+  const spinning = S && S.current && now() < S.current.at;
+  const sig = `${spinning}:${view}:${S && S.round}:${auto}:${autoSecs}:${muted}`;
   if (sig !== dockSig) { dockSig = sig; renderDock(); }
 }
 
 const actions = {
   draw: () => host('host-draw', {}).then(() => { view = 'auto'; }),
-  second: () => host('host-draw', { second: true }).then(() => { view = 'auto'; }),
-  close: () => host('host-close'),
+  autoToggle: () => { auto = !auto; flash(auto ? `Auto-draw on, every ${autoSecs} seconds` : 'Auto-draw off'); },
+  undo: () => modal(`<h2>Undo the last draw?</h2><p>Puts <b>${esc((S.current && S.current.label) || 'it')}</b> back in the bag. Anyone who already marked it keeps the mark.</p>
+    <div class="row"><button class="primary" id="ok">Undo draw</button><button id="no">Cancel</button></div>`, (p) => {
+    $('#no', p).onclick = closeModal;
+    $('#ok', p).onclick = async () => { closeModal(); const r = await host('host-undo'); flash(`${r.undone} is back in the bag`); };
+  }),
   auto: () => { view = 'auto'; },
   board: () => { view = view === 'board' ? 'auto' : 'board'; },
   lobby: () => { view = view === 'lobby' ? 'auto' : 'lobby'; },
   round: (b) => {
     const r = parseInt(b.dataset.r, 10);
     if (S.round === r) return;
-    modal(`<h2>Start Round ${r}?</h2><p>The goal becomes <b>${({ 1: 'Any line', 2: 'Two lines', 3: 'Blackout race' })[r]}</b>. If someone already qualifies, the best eligible card wins right away. Previous winners cannot win again.</p>
+    modal(`<h2>Start Round ${r}?</h2><p>The goal becomes <b>${({ 1: 'Any line', 2: 'Two lines', 3: 'Full card' })[r]}</b>. Anyone who already has it can press BINGO right away. Previous winners cannot win again.</p>
       <div class="row"><button class="primary" id="ok">Start Round ${r}</button><button id="no">Cancel</button></div>`, (p) => {
       $('#no', p).onclick = closeModal;
       $('#ok', p).onclick = async () => { closeModal(); const res = await host('host-round', { round: r }); if (res.autoWinner) flash(`${res.autoWinner.name} already had it!`); };
     });
   },
-  crown: () => modal(`<h2>Crown the leader?</h2><p>Awards Round ${S.round} to the top eligible player on the leaderboard right now (most useful to end the blackout race). Leader: <b>${esc((S.top.find((r) => !r.won) || {}).name || 'nobody yet')}</b>.</p>
+  crown: () => modal(`<h2>Crown the leader?</h2><p>Awards Round ${S.round} to the top eligible player on the leaderboard right now (use it if nobody claims before time runs out). Leader: <b>${esc((S.top.find((r) => !r.won) || {}).name || 'nobody yet')}</b>.</p>
     <div class="row"><button class="primary" id="ok">Crown them</button><button id="no">Cancel</button></div>`, (p) => {
     $('#no', p).onclick = closeModal;
     $('#ok', p).onclick = async () => { closeModal(); await host('host-crown'); };
@@ -297,7 +280,7 @@ async function openMore() {
     $('#saveTabs', p).onclick = () => host('host-settings', { tables: $('#tabs', p).value }).then(() => flash('Saved'));
     p.querySelectorAll('[data-kick]').forEach((b) => (b.onclick = () => host('host-kick', { pid: b.dataset.kick }).then(openMore)));
     p.querySelectorAll('[data-clear]').forEach((b) => (b.onclick = () => host('host-clear-win', { round: b.dataset.clear }).then(() => { seenWins = null; openMore(); })));
-    $('#doReset', p).onclick = () => host('host-reset', { confirm: $('#rs', p).value.trim() }).then(() => { seenWins = null; landed = {}; closeModal(); flash('Game reset'); });
+    $('#doReset', p).onclick = () => host('host-reset', { confirm: $('#rs', p).value.trim() }).then(() => { seenWins = null; closeModal(); flash('Game reset'); });
     $('#signout', p).onclick = () => { localStorage.removeItem('etibingo:hostkey'); hostKey = ''; closeModal(); askKey(); };
   });
 }
@@ -306,7 +289,7 @@ document.addEventListener('keydown', (e) => {
   if ($('#modal').classList.contains('show') || e.target.matches('input, select, textarea')) return;
   if (winnerUp && (e.key === 'Enter' || e.key === 'Escape' || e.key === ' ')) { $('#winner').classList.remove('show'); winnerUp = false; return; }
   if (stageOnly) return;
-  const map = { d: 'draw', s: 'second', e: 'close', g: 'auto', l: 'board', q: 'lobby', h: 'hide', m: 'mute' };
+  const map = { d: 'draw', a: 'autoToggle', g: 'auto', l: 'board', q: 'lobby', h: 'hide', m: 'mute' };
   const a = map[e.key.toLowerCase()];
   if (!a) return;
   const b = $(`#dock button[data-a="${a}"]`);
@@ -331,5 +314,14 @@ async function poll() {
 setInterval(poll, 1000);
 setInterval(() => { if (S) { renderStage(); maybeDock(); } }, 90);
 setInterval(() => { if (S && phase() === 'lobby') loadNames(); }, 5000);
+// Auto-draw: next square once the last one has been up for autoSecs.
+setInterval(async () => {
+  if (!auto || autoBusy || !S || winnerUp || !hostKey) return;
+  if (S.left === 0) { auto = false; flash('Every square has been called'); return; }
+  const d = S.current;
+  if (d && now() < d.at + autoSecs * 1000) return;
+  autoBusy = true;
+  try { await host('host-draw', {}); } catch { auto = false; } finally { autoBusy = false; }
+}, 500);
 if (!hostKey && !stageOnly) askKey();
 poll();

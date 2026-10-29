@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "private": true,
   "type": "module",
-  "description": "ETI Q4 Townhall 2026 bingo: one card per person, host draws with 60-second challenges, live leaderboard.",
+  "description": "ETI Q4 Townhall 2026 bingo: one card per person, host draws, tap to mark, BINGO button, live leaderboard.",
   "scripts": {
     "dev": "node dev-server.mjs",
     "sim": "node tools/sim-players.mjs"

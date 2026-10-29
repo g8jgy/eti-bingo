@@ -1,34 +1,35 @@
 # ETI Bingo
 
 Live bingo for the ETI Q4 Townhall (Wed Nov 18, 2026). One card per person on their phone,
-host draws with timed challenges on the projector, live leaderboard.
+host draws on the projector, players tap to mark, live leaderboard.
 
 ## How the game works
 
-- Every card holds the same 24 squares (2026 launches, GDI brands, ETI, 2027 goals) in a
-  unique order, with the yETI free square in the center. Every draw matters to everyone.
-- The host draws a square. Phones get a multiple-choice challenge (60 seconds by default).
-  A correct answer marks that square. The answer is revealed on the big screen and phones.
-- Missed squares come back through **Second chance** draws with a different question.
+- 36 squares in the bag (2026 launches, 2027 goals, GDI brands). Each card gets 24 of them in
+  its own order, with the yETI free square in the center.
+- The host draws a square. It shows big on the projector with a one-line caption, and glows on
+  every phone that has it. Players tap it to mark it. Only called squares can be marked.
+- When a card completes the round's pattern, a BINGO button appears on that phone. The first
+  press wins (checked on the server). One prize per person.
 - **Free square**: the host awards it to tables (for example Jeopardy winners). Everyone at
   those tables taps any open square to mark it.
-- Rounds (tuned by simulating 70 players at 75% accuracy):
-  | Round | Goal | Expected first winner |
+- **Auto-draw** calls the next square every 10 to 30 seconds and pauses when someone wins.
+- Rounds (simulated with 70 players):
+  | Round | Goal | First winner around |
   |---|---|---|
-  | 1 | Any line | around draw 7 to 9 |
-  | 2 | Two lines | around draw 14 |
-  | 3 | Blackout race | usually needs second chances; host ends it with **Crown leader** |
-- First correct answer that completes the goal wins. One prize per person: past winners keep
-  playing but can't win again. Starting a round awards it right away if someone already qualifies.
+  | 1 | Any line | draw 6 to 11 |
+  | 2 | Two lines | draw 15 to 17 |
+  | 3 | Full card | draw 33 to 34 |
+- **Crown leader** awards the round to whoever is closest if time runs out.
 
 ## Pages
 
 | Path | Who | What |
 |---|---|---|
 | `/` | Players | Join (name + table) and play. `/?t=4` presets table 4. |
-| `/host` | Host laptop | Stage + control dock. Keys: D draw, S second chance, E end timer, L leaderboard, Q join QR, G game, H hide dock, M mute. |
+| `/host` | Host laptop | Stage + control dock. Keys: D draw, A auto-draw, L leaderboard, Q join QR, G game, H hide dock, M mute. |
 | `/host?stage=1` | Projector (optional) | Stage only, no controls. |
-| `/review` | Host | Every question with the answer, printable. Needs the host key. |
+| `/review` | Host | All 36 squares with tile text and captions, printable. Needs the host key. |
 | `/tents?tables=10` | Host | Printable table cards with a QR per table. |
 
 ## Run locally
@@ -43,7 +44,7 @@ Load test (separate fast server, 70 players):
 
 ```bash
 BINGO_FAST=1 BINGO_PREFIX=sim node dev-server.mjs 8796
-node tools/sim-players.mjs http://localhost:8796 70 0.75
+node tools/sim-players.mjs http://localhost:8796 70 0.9
 ```
 
 ## Deploy (Vercel + Upstash Redis, both free tiers)
@@ -59,4 +60,4 @@ node tools/sim-players.mjs http://localhost:8796 70 0.75
 Before the event: open `/host`, More, **Reset game** to clear test cards.
 
 Load: phones poll a state endpoint the Vercel CDN caches for one second, so 70 phones cost
-about one function call per second. Answers write only the player's own record.
+about one function call per second. A tap writes only the player's own record.
