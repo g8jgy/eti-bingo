@@ -1,0 +1,5 @@
+{
+  "outputDirectory": "public",
+  "cleanUrls": true,
+  "functions": { "api/game.js": { "maxDuration": 10 } }
+}

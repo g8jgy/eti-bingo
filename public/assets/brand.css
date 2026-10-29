@@ -1,0 +1,35 @@
+/* ETI Bingo shared tokens (GDI navy + sun amber) */
+:root {
+  --navy: #00358A;
+  --navy-2: #0B3D91;
+  --deep: #001b4a;
+  --amber: #FFA000;
+  --sun: #F5A100;
+  --cream: #fff7e6;
+  --ink: #1d2433;
+  --muted: #667085;
+  --line: #d9e0ea;
+  --tint: #f3f6fb;
+  --good: #1d8a4e;
+  --bad: #c8372d;
+  --display: "Barlow Condensed", "Arial Narrow", sans-serif;
+  --body: "DM Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html { -webkit-text-size-adjust: 100%; }
+body { font-family: var(--body); color: var(--ink); background: var(--tint); }
+button { font: inherit; color: inherit; border: 0; background: none; cursor: pointer; -webkit-tap-highlight-color: transparent; }
+input, select { font: inherit; }
+.mark svg { display: block; width: 100%; height: 100%; }
+
+.confetti {
+  position: fixed; top: -12px; width: 9px; height: 14px; border-radius: 2px; z-index: 99; pointer-events: none;
+  animation: fall linear forwards;
+}
+@keyframes fall {
+  to { transform: translate(var(--drift), 108vh) rotate(var(--spin)); opacity: 0.9; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .confetti { display: none; }
+  *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
+}

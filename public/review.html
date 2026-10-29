@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>ETI Bingo Question Review</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@700;800&family=DM+Sans:opsz,wght@9..40,400;9..40,700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/assets/brand.css">
+<style>
+  body { background: #fff; padding: 28px 20px 60px; }
+  .wrap { max-width: 900px; margin: 0 auto; }
+  h1 { font-family: var(--display); font-weight: 800; font-size: 40px; color: var(--navy); }
+  h1 span { color: var(--amber); }
+  .lead { color: var(--muted); margin: 4px 0 20px; }
+  .sq { border: 1px solid var(--line); border-top: 4px solid var(--navy); border-radius: 10px; padding: 12px 16px; margin-bottom: 14px; break-inside: avoid; }
+  .sq h2 { font-family: var(--display); font-weight: 800; font-size: 22px; color: var(--navy); }
+  .q { margin-top: 10px; }
+  .q .lab { font-size: 11px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; color: var(--muted); }
+  .q p { font-weight: 700; margin: 2px 0 4px; }
+  .q ol { margin-left: 22px; }
+  .q li.ok { color: var(--good); font-weight: 700; }
+  .q .fact { font-size: 13px; color: #6b4a00; background: var(--cream); border-radius: 6px; padding: 4px 8px; margin-top: 4px; }
+  .gate { max-width: 360px; margin: 60px auto; }
+  .gate input { width: 100%; padding: 10px; border: 1px solid var(--line); border-radius: 8px; margin: 10px 0; }
+  .gate button { background: var(--navy); color: #fff; padding: 10px 16px; border-radius: 8px; font-weight: 700; }
+  @media print { body { padding: 0; } .noprint { display: none; } }
+</style>
+</head>
+<body>
+<div class="wrap" id="app"></div>
+<script type="module">
+  import { api, esc } from '/assets/common.js';
+  const app = document.getElementById('app');
+  async function show(key) {
+    try {
+      const { squares } = await api('host-content', {}, key);
+      localStorage.setItem('etibingo:hostkey', key);
+      app.innerHTML = `<h1>ETI <span>Bingo</span> question review</h1>
+        <p class="lead">24 squares, two questions each. The correct answer is in green; options are shuffled on screen. Second-chance questions are used when a missed square is drawn again. <a class="noprint" href="javascript:print()">Print</a></p>
+        ${squares.map((s, n) => `<div class="sq"><h2>${n + 1}. ${esc(s.label)}</h2>
+          ${s.qs.map((q, i) => `<div class="q"><div class="lab">${i ? 'Second chance' : 'First draw'}</div><p>${esc(q.q)}</p>
+            <ol type="A">${q.options.map((o, j) => `<li class="${j === q.a ? 'ok' : ''}">${esc(o)}</li>`).join('')}</ol>
+            <div class="fact">Reveal: ${esc(q.fact)}</div></div>`).join('')}</div>`).join('')}`;
+    } catch (e) { gate(e.message); }
+  }
+  function gate(err = '') {
+    app.innerHTML = `<div class="gate"><h1>ETI <span>Bingo</span></h1><p class="lead">Host key required to see answers.</p>
+      <input id="k" type="password" placeholder="Host key"><button id="go">Show questions</button><p style="color:var(--bad)">${esc(err)}</p></div>`;
+    document.getElementById('go').onclick = () => show(document.getElementById('k').value.trim());
+  }
+  const saved = localStorage.getItem('etibingo:hostkey');
+  saved ? show(saved) : gate();
+</script>
+</body>
+</html>
