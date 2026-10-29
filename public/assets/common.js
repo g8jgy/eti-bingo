@@ -1,7 +1,16 @@
 // Shared helpers for the player card, host screen and print pages.
-export const API = '/api/game';
+// Relative, so the app also works from a subfolder (GitHub Pages serves it under /eti-bingo/).
+export const API = 'api/game';
+
+// The hosted build sets window.BINGO_CONFIG (assets/config.js) to play through Supabase instead.
+let supa = null;
 
 export async function api(op, body, hostKey) {
+  const cfg = window.BINGO_CONFIG;
+  if (cfg && cfg.supabaseUrl) {
+    supa = supa || import('./supabase-api.js').then((m) => m.supabaseApi(cfg));
+    return (await supa)(op, body, hostKey);
+  }
   const opts = body === undefined
     ? { method: 'GET', cache: 'no-store' }
     : { method: 'POST', headers: { 'Content-Type': 'application/json', ...(hostKey ? { 'x-host-key': hostKey } : {}) }, body: JSON.stringify(body) };

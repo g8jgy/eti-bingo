@@ -9,7 +9,21 @@ const KEY = process.env.HOST_KEY || 'eti-host';
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const stats = { calls: 0, errors: [], maxMs: 0, stateBytes: 0 };
+// Supabase mode (GitHub Pages build): SUPA_URL=http://localhost:8797 node tools/sim-players.mjs supabase 70 0.9
+// plays through public/assets/supabase-api.js, the same adapter the pages use.
+let supa = null;
+if (process.env.SUPA_URL) {
+  const fs = await import('node:fs');
+  for (const f of ['content.js', 'engine.js']) fs.copyFileSync(new URL('../lib/' + f, import.meta.url), new URL('../public/assets/' + f, import.meta.url));
+  const { supabaseApi } = await import('../public/assets/supabase-api.js');
+  supa = supabaseApi({ supabaseUrl: process.env.SUPA_URL, supabaseKey: 'sb_publishable_localtest' });
+}
 async function call(op, body, host) {
+  if (supa) {
+    const t0 = Date.now();
+    stats.calls++;
+    try { return await supa(op, body, host ? KEY : undefined); } catch (e) { e.message = `${op}: ${e.message}`; throw e; } finally { stats.maxMs = Math.max(stats.maxMs, Date.now() - t0); }
+  }
   const t0 = Date.now();
   stats.calls++;
   const r = await fetch(`${BASE}/api/game?op=${op}`, body === undefined ? {} : {

@@ -1,4 +1,7 @@
-.data/
-node_modules/
 *.log
+.data/
 .vercel
+node_modules/
+public/assets/content.js
+public/assets/engine.js
+tools/supa-test/node_modules/

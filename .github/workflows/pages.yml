@@ -1,0 +1,30 @@
+# Publishes public/ to GitHub Pages on every push to the default branch.
+# The pages play through Supabase (public/assets/config.js); the Node API in api/ is not used there.
+name: Deploy to GitHub Pages
+on:
+  push:
+    branches: [main, master]
+  workflow_dispatch:
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+concurrency:
+  group: pages
+  cancel-in-progress: true
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Copy the shared game content into the site
+        run: cp lib/content.js lib/engine.js public/assets/
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: public
+      - id: deployment
+        uses: actions/deploy-pages@v4

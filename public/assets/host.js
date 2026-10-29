@@ -5,7 +5,7 @@ const stageOnly = params.get('stage') === '1';
 let hostKey = localStorage.getItem('etibingo:hostkey') || '';
 let S = null, view = 'auto', stageKey = '', muted = localStorage.getItem('etibingo:mute') === '1';
 let seenWins = null, winnerUp = false, auto = false, autoSecs = 15, autoBusy = false;
-const playUrl = location.origin + '/';
+const playUrl = new URL('./', location.href).href; // the player page, wherever the app is hosted
 
 $('#logo').innerHTML = LOGO;
 
@@ -256,7 +256,7 @@ async function openMore() {
   let players = [];
   try { players = (await api('host-players', {}, hostKey)).players; } catch (e) { flash(e.message); }
   modal(`<h2>Game settings</h2>
-    <div class="row"><a href="/review" target="_blank">Review all squares</a> &middot; <a href="/tents" target="_blank">Print join QR cards</a> &middot; <a href="/host?stage=1" target="_blank">Stage-only view</a></div>
+    <div class="row"><a href="review.html" target="_blank">Review all squares</a> &middot; <a href="tents.html" target="_blank">Print join QR cards</a> &middot; <a href="host.html?stage=1" target="_blank">Stage-only view</a></div>
     <div class="row">Winners: ${roundNums().map((r) => S.wins[r] ? `<button class="danger" data-clear="${r}">Clear R${r}: ${esc(S.wins[r].name)}</button>` : `<span style="color:var(--muted)">R${r}: none</span>`).join(' ')}</div>
     <h2 style="font-size:20px;margin-top:14px">Players (${players.length})</h2>
     <table><tr><th>#</th><th>Name</th><th>Marked</th><th>To go</th><th></th></tr>

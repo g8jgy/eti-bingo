@@ -52,7 +52,34 @@ BINGO_FAST=1 BINGO_PREFIX=sim node dev-server.mjs 8796
 node tools/sim-players.mjs http://localhost:8796 70 0.9
 ```
 
-## Deploy (Vercel + Upstash Redis, both free tiers)
+## Host it: GitHub Pages + Supabase (the Nov 18 setup)
+
+The pages are static files on GitHub Pages; the game runs as Postgres functions in a free Supabase
+project (`supabase/setup.sql`). No login for players, no server to run.
+
+1. **Supabase** (supabase.com, sign in with GitHub): New project, name `eti-bingo`, region East US,
+   free plan. Save the database password somewhere safe.
+2. **SQL Editor**, New query: paste all of `supabase/setup.sql`, Run. Then set the host passphrase:
+   `update bingo.config set value = to_jsonb('your passphrase'::text) where key = 'host_key';`
+   The host controls refuse to work while it is still `CHANGE-ME`.
+3. **Project Settings, API keys**: copy the Project URL and the publishable (anon) key into
+   `public/assets/config.js`. Both are meant to be public; phones can only call the `bingo_*` functions.
+4. **GitHub**: push to a public repo, then Settings, Pages, Source: **GitHub Actions**. The workflow in
+   `.github/workflows/pages.yml` publishes `public/` on every push.
+   Players: `https://<account>.github.io/eti-bingo/` · host screen: `…/eti-bingo/host.html`.
+5. Open the host screen, enter the passphrase, press Q: the QR code points at the player page.
+
+Notes:
+- A free Supabase project pauses after 7 days with no use. Open the game at least once a week
+  (the Nov 10 test and Nov 14 dry run cover it), or resume it from the Supabase dashboard.
+- Before the event: host screen, More, **Reset game** clears test cards.
+- After changing squares in `lib/content.js`: run `node tools/build-supabase-sql.mjs`, run `setup.sql`
+  again (it keeps players and refreshes the round pools), then push.
+- Test locally first: `cd tools/supa-test && npm install && node shim.mjs` runs `setup.sql` in PGlite and
+  serves the site at http://localhost:8797/eti-bingo/ (host key `eti-host`). Load test against it:
+  `SUPA_URL=http://localhost:8797 node tools/sim-players.mjs supabase 70 0.9`.
+
+## Alternative: Vercel + Upstash Redis
 
 1. Push this folder to a private GitHub repo under jgyoerger1 (set repo-local
    `user.email` to the jgyoerger1 noreply address or Vercel blocks the deploy).
