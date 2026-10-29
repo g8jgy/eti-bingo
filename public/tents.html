@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="robots" content="noindex">
-<title>ETI Bingo Table Cards</title>
+<title>ETI Bingo QR Cards</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@700;800&family=DM+Sans:opsz,wght@9..40,400;9..40,700&display=swap" rel="stylesheet">
@@ -32,19 +32,19 @@
 </style>
 </head>
 <body>
-<div class="bar">Two table cards per page. Fold or cut on the dashed line. <button onclick="print()">Print</button></div>
+<div class="bar">Two QR cards per page; put one on each table. Fold or cut on the dashed line. <button onclick="print()">Print</button></div>
 <div id="pages"></div>
 <script type="module">
   import { LOGO, qrSvg } from '/assets/common.js';
-  const n = Math.max(1, Math.min(30, parseInt(new URLSearchParams(location.search).get('tables'), 10) || 10));
+  const n = Math.max(1, Math.min(30, parseInt(new URLSearchParams(location.search).get('count'), 10) || 10));
   const host = location.origin.replace(/^https?:\/\//, '');
   const cards = Array.from({ length: n }, (_, i) => {
-    const t = i + 1, url = `${location.origin}/?t=${t}`;
+    const url = `${location.origin}/`;
     return `<div class="card"><div>
       <div class="brand"><div class="mark">${LOGO}</div><div class="eyebrow">ETI Q4 Townhall</div></div>
-      <h1>ETI <span>Bingo</span></h1><div class="table">Table ${t}</div>
+      <h1>ETI <span>Bingo</span></h1>
       <p class="how">Scan to get your own card. When a square is called, tap it on your card. Complete the pattern and hit BINGO first to win.</p></div>
-      <div><div class="qr">${qrSvg(url)}</div><div class="url">${host}/?t=${t}</div></div></div>`;
+      <div><div class="qr">${qrSvg(url)}</div><div class="url">${host}</div></div></div>`;
   });
   let html = '';
   for (let i = 0; i < cards.length; i += 2) html += `<div class="page">${cards[i]}${cards[i + 1] || '<div class="card"></div>'}</div>`;

@@ -60,11 +60,7 @@
   @keyframes stamp { 0% { transform: scale(.75); } 100% { transform: scale(1); } }
   .tile.ready { background: #fff4dc; border: 2px solid var(--amber); color: #6b4300; animation: glow 1.2s ease-in-out infinite; }
   @keyframes glow { 50% { box-shadow: 0 0 0 4px rgba(255,160,0,.35); } }
-  .tile.pick { animation: glow 1.2s ease-in-out infinite; border-color: var(--amber); }
-  .tile.pick.sel { background: var(--amber); color: #3a2a00; animation: none; }
 
-  .banner { margin: 10px 0 0; background: var(--cream); border: 1.5px solid var(--amber); border-radius: 12px; padding: 10px 12px; font-size: 14px; color: #5a3b00; }
-  .banner b { color: #3a2a00; }
   .hint { text-align: center; color: var(--muted); font-size: 12.5px; margin-top: 12px; }
   .toast { position: fixed; left: 50%; top: calc(70px + env(safe-area-inset-top)); transform: translate(-50%, -16px); opacity: 0; background: var(--deep); color: #fff; padding: 11px 16px; border-radius: 12px; font-size: 14px; max-width: 92vw; z-index: 30; transition: .3s; box-shadow: 0 10px 30px -10px rgba(0,0,0,.5); pointer-events: none; }
   .toast.show { opacity: 1; transform: translate(-50%, 0); }

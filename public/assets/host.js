@@ -104,7 +104,7 @@ function renderStage() {
     loadNames();
   } else if (p === 'board') {
     st.innerHTML = `<div class="board"><div class="eyebrow">Round ${S.round} &middot; ${esc(S.goalLabel)}</div><h2>Leaderboard</h2>
-      <ol>${S.top.map((r, i) => `<li><span class="r">${i + 1}</span><span class="n">${esc(r.name)}<small>Table ${r.table}</small></span>
+      <ol>${S.top.map((r, i) => `<li><span class="r">${i + 1}</span><span class="n">${esc(r.name)}</span>
         <span class="togo">${r.won ? 'Won R' + r.won : r.toGo === 0 ? 'BINGO' : r.toGo + ' to go'}</span></li>`).join('')}</ol></div>`;
   } else if (p === 'spin') {
     st.innerHTML = `<div class="spin"><div class="eyebrow">Draw ${d.n}</div><div class="reel" id="reel">&nbsp;</div></div>`;
@@ -157,7 +157,7 @@ function renderChrome() {
   $('#called').innerHTML = S.tiles.map((l, i) => `<div class="${i === now_ ? 'now' : called.has(i) ? 'on' : ''}">${esc(l)}</div>`).join('');
   $('#calledN').textContent = `${S.called.length}/${S.labels.length}`;
   $('#goalS').textContent = S.goalLabel;
-  $('#lb').innerHTML = S.top.slice(0, 6).map((r, i) => `<li><span class="r">${i + 1}</span><span class="n">${esc(r.name)}<small>T${r.table}</small></span><span class="g ${r.toGo === 1 && !r.won ? 'one' : ''}">${r.won ? 'Won R' + r.won : r.toGo === 0 ? 'BINGO' : r.toGo + ' to go'}</span></li>`).join('')
+  $('#lb').innerHTML = S.top.slice(0, 6).map((r, i) => `<li><span class="r">${i + 1}</span><span class="n">${esc(r.name)}</span><span class="g ${r.toGo === 1 && !r.won ? 'one' : ''}">${r.won ? 'Won R' + r.won : r.toGo === 0 ? 'BINGO' : r.toGo + ' to go'}</span></li>`).join('')
     || '<li style="grid-template-columns:1fr;color:#9fb2d4">Waiting for players</li>';
 }
 
@@ -174,7 +174,7 @@ function checkWins() {
 function showWinner(r, w) {
   const el = $('#winner');
   el.innerHTML = `<div class="eyebrow">Round ${r} &middot; ${esc(({ 1: 'Any line', 2: 'Two lines', 3: 'Full card' })[r])}</div>
-    <div class="big">BINGO!</div><div class="who">${esc(w.name)}</div><div class="meta">Table ${w.table}</div>
+    <div class="big">BINGO!</div><div class="who">${esc(w.name)}</div>
     <div class="hintx">Click or press Enter to continue</div>`;
   el.classList.add('show'); winnerUp = true;
   if (auto) { auto = false; flash('Auto-draw paused for the winner'); }
@@ -201,7 +201,6 @@ function renderDock() {
     <span class="sep"></span>
     ${[1, 2, 3].map((r) => `<button data-a="round" data-r="${r}" class="${S && S.round === r ? 'on' : ''}">R${r}</button>`).join('')}
     <button data-a="crown">Crown leader</button>
-    <button data-a="free">Free square</button>
     <span class="sep"></span>
     <button data-a="more">More</button>
     <button data-a="mute">${muted ? 'Sound off' : 'Sound on'}</button>
@@ -240,17 +239,6 @@ const actions = {
     $('#no', p).onclick = closeModal;
     $('#ok', p).onclick = async () => { closeModal(); await host('host-crown'); };
   }),
-  free: () => {
-    const sel = new Set();
-    modal(`<h2>Award a free square</h2><p>Everyone at the selected tables can mark any open square on their card.</p>
-      <input id="fl" placeholder="What for? (e.g. Jeopardy winners)" maxlength="40">
-      <div class="tablegrid" style="margin-top:10px">${Array.from({ length: S.tables }, (_, i) => `<button data-t="${i + 1}">Table ${i + 1}</button>`).join('')}</div>
-      <div class="row"><button class="primary" id="ok">Award</button><button id="no">Cancel</button></div>`, (p) => {
-      p.querySelectorAll('[data-t]').forEach((b) => (b.onclick = () => { const t = +b.dataset.t; sel.has(t) ? sel.delete(t) : sel.add(t); b.classList.toggle('sel'); }));
-      $('#no', p).onclick = closeModal;
-      $('#ok', p).onclick = async () => { closeModal(); await host('host-free', { tables: [...sel], label: $('#fl', p).value }); flash(`Free square sent to table${sel.size > 1 ? 's' : ''} ${[...sel].join(', ')}`); };
-    });
-  },
   more: () => openMore(),
   mute: () => { muted = !muted; localStorage.setItem('etibingo:mute', muted ? '1' : '0'); },
   hide: () => { $('#dock').classList.toggle('hide'); document.body.classList.toggle('docked', !$('#dock').classList.contains('hide')); },
@@ -266,18 +254,16 @@ async function openMore() {
   let players = [];
   try { players = (await api('host-players', {}, hostKey)).players; } catch (e) { flash(e.message); }
   modal(`<h2>Game settings</h2>
-    <div class="row"><a href="/review" target="_blank">Review all squares</a> &middot; <a href="/tents?tables=${S.tables}" target="_blank">Print table QR tents</a> &middot; <a href="/host?stage=1" target="_blank">Stage-only view</a></div>
-    <div class="row">Tables: <input id="tabs" type="number" min="1" max="30" value="${S.tables}" style="width:80px"><button id="saveTabs">Save</button></div>
+    <div class="row"><a href="/review" target="_blank">Review all squares</a> &middot; <a href="/tents" target="_blank">Print join QR cards</a> &middot; <a href="/host?stage=1" target="_blank">Stage-only view</a></div>
     <div class="row">Winners: ${[1, 2, 3].map((r) => S.wins[r] ? `<button class="danger" data-clear="${r}">Clear R${r}: ${esc(S.wins[r].name)}</button>` : `<span style="color:var(--muted)">R${r}: none</span>`).join(' ')}</div>
     <h2 style="font-size:20px;margin-top:14px">Players (${players.length})</h2>
-    <table><tr><th>#</th><th>Name</th><th>Table</th><th>Marked</th><th>To go</th><th></th></tr>
-    ${players.map((p) => `<tr><td>${p.rank}</td><td>${esc(p.name)}</td><td>${p.table}</td><td>${p.marks}</td><td>${p.toGo}</td><td><button class="danger" data-kick="${p.id}">Remove</button></td></tr>`).join('')}</table>
+    <table><tr><th>#</th><th>Name</th><th>Marked</th><th>To go</th><th></th></tr>
+    ${players.map((p) => `<tr><td>${p.rank}</td><td>${esc(p.name)}</td><td>${p.marks}</td><td>${p.toGo}</td><td><button class="danger" data-kick="${p.id}">Remove</button></td></tr>`).join('')}</table>
     <h2 style="font-size:20px;margin-top:18px;color:var(--bad)">Reset game</h2>
     <p>Deletes every card, answer and winner. Type RESET to confirm.</p>
     <div class="row"><input id="rs" placeholder="RESET" style="width:140px"><button class="danger" id="doReset">Reset everything</button></div>
     <div class="row"><button id="no">Close</button><button id="signout">Sign out of host</button></div>`, (p) => {
     $('#no', p).onclick = closeModal;
-    $('#saveTabs', p).onclick = () => host('host-settings', { tables: $('#tabs', p).value }).then(() => flash('Saved'));
     p.querySelectorAll('[data-kick]').forEach((b) => (b.onclick = () => host('host-kick', { pid: b.dataset.kick }).then(openMore)));
     p.querySelectorAll('[data-clear]').forEach((b) => (b.onclick = () => host('host-clear-win', { round: b.dataset.clear }).then(() => { seenWins = null; openMore(); })));
     $('#doReset', p).onclick = () => host('host-reset', { confirm: $('#rs', p).value.trim() }).then(() => { seenWins = null; closeModal(); flash('Game reset'); });

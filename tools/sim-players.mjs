@@ -33,11 +33,10 @@ const done = (goal, marks) => {
 };
 
 await call('host-reset', { confirm: 'RESET' }, true);
-await call('host-settings', { tables: 10 }, true);
 
 const first = ['Ana', 'Ben', 'Cal', 'Dee', 'Eli', 'Fay', 'Gus', 'Hal', 'Ida', 'Jo', 'Kai', 'Lu', 'Max', 'Ned', 'Oz'];
 const players = await Promise.all(Array.from({ length: N }, (_, i) =>
-  call('join', { name: `${first[i % first.length]} Test${i + 1}`, table: (i % 10) + 1 }).then((r) => ({ pid: r.pid, token: r.token, table: (i % 10) + 1, cells: r.player.cells, marks: [], won: 0 }))));
+  call('join', { name: `${first[i % first.length]} Test${i + 1}` }).then((r) => ({ pid: r.pid, token: r.token, cells: r.player.cells, marks: [], won: 0 }))));
 console.log(`joined ${players.length} players, ${new Set(players.map((p) => p.cells.join(','))).size} unique cards`);
 
 // rules that must hold
@@ -60,20 +59,7 @@ for (let n = 1; n <= 36; n++) {
     for (const [, i] of todo) {
       try { await call('mark', { pid: p.pid, token: p.token, cell: i }); p.marks.push(i); } catch (e) { stats.errors.push(e.message); }
     }
-    if (n === 5 && (p.table === 3 || p.table === 7)) { /* free square handled below */ }
   }));
-
-  if (n === 5) { // Jeopardy winners: tables 3 and 7 get a free square
-    const { freebie } = await call('host-free', { tables: [3, 7], label: 'Jeopardy' }, true);
-    const lucky = players.filter((p) => p.table === 3 || p.table === 7);
-    for (const p of lucky) {
-      const open = p.cells.findIndex((sq, i) => sq !== -1 && !p.marks.includes(i) && !called.has(sq));
-      await call('free', { pid: p.pid, token: p.token, freeId: freebie.id, cell: open });
-      p.marks.push(open);
-    }
-    try { await call('free', { pid: players[0].pid, token: players[0].token, freeId: freebie.id, cell: 0 }); stats.errors.push('table 1 used a table 3/7 freebie'); } catch { /* expected */ }
-    console.log(`free square used by ${lucky.length} players at tables 3 and 7`);
-  }
 
   // everyone who can press BINGO does, at the same moment
   const ready = players.filter((p) => !p.won && done(goals[round], p.marks));
@@ -85,7 +71,7 @@ for (let n = 1; n <= 36; n++) {
     s = await call('state');
     const w = s.wins[round];
     winsAt[round] = n;
-    console.log(`ROUND ${round} (${goals[round]}) won on draw ${n} by ${w.name} (table ${w.table}); ${ready.length} pressed BINGO at once`);
+    console.log(`ROUND ${round} (${goals[round]}) won on draw ${n} by ${w.name}; ${ready.length} pressed BINGO at once`);
     if (round < 3) { round++; await call('host-round', { round }, true); }
     else break;
   }

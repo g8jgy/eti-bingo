@@ -11,7 +11,6 @@ let lastV = null;
 let lastDraw = load('lastDraw', null);
 let seenWins = load('wins', {});
 let stampCell = null;
-let pick = null;                 // selected cell for a free square
 let pending = new Set();         // cells being marked right now
 const LETTERS = ['B', 'I', 'N', 'G', 'O'];
 const app = $('#app');
@@ -45,8 +44,6 @@ const buzz = (p) => { try { navigator.vibrate && navigator.vibrate(p); } catch {
 
 // ---------------------------------------------------------------- join
 function renderJoin(errMsg = '') {
-  const tables = (S && S.tables) || 10;
-  const preset = parseInt(new URLSearchParams(location.search).get('t'), 10);
   app.innerHTML = `
     <form class="join" id="joinForm" autocomplete="off">
       <div class="mark">${LOGO}</div>
@@ -55,11 +52,6 @@ function renderJoin(errMsg = '') {
       <p class="sub">Get your card, tap each square when it's called, and hit BINGO first to win.</p>
       <label for="nm">Your name</label>
       <input id="nm" name="name" maxlength="32" placeholder="First and last name" value="${esc(load('name', ''))}" required>
-      <label for="tb">Your table</label>
-      <select id="tb" name="table" required>
-        <option value="">Pick your table</option>
-        ${Array.from({ length: tables }, (_, i) => `<option value="${i + 1}" ${preset === i + 1 ? 'selected' : ''}>Table ${i + 1}</option>`).join('')}
-      </select>
       <button class="btn" id="go" type="submit">Get my card</button>
       <div class="err" id="err">${esc(errMsg)}</div>
       <p class="fine">One card per person. Keep this page open on your phone.</p>
@@ -71,7 +63,7 @@ function renderJoin(errMsg = '') {
     btn.disabled = true;
     try {
       const name = $('#nm').value.trim();
-      const r = await api('join', { name, table: $('#tb').value });
+      const r = await api('join', { name });
       syncClock(r.now, 1);
       cred = { pid: r.pid, token: r.token };
       keep('cred', cred); keep('name', name);
@@ -91,7 +83,7 @@ function renderMain() {
   app.innerHTML = `
     <header class="top">
       <div class="mark">${LOGO}</div>
-      <div><h1>ETI <span>Bingo</span></h1><div class="who">${esc(me.name)} &middot; Table ${me.table}</div></div>
+      <div><h1>ETI <span>Bingo</span></h1><div class="who">${esc(me.name)}</div></div>
       <div class="chip" id="chip"></div>
     </header>
     <div class="sunrule"></div>
@@ -102,7 +94,6 @@ function renderMain() {
         <div class="letters">${LETTERS.map((l) => `<div>${l}</div>`).join('')}</div>
         <div class="grid" id="grid"></div>
       </div>
-      <div id="banner"></div>
       <p class="hint" id="hint"></p>
     </main>`;
   $('#grid').addEventListener('click', onTile);
@@ -110,7 +101,6 @@ function renderMain() {
 }
 
 const calledSet = () => new Set(S.called);
-const activeFreebie = () => (S && me ? S.freebies.find((f) => f.tables.includes(me.table) && (me.free || {})[f.id] == null) || null : null);
 
 function renderCalled() {
   const el = $('#called');
@@ -133,8 +123,6 @@ function renderStatus() {
   $('#status').innerHTML = `${won}
     <div class="stat"><b>#${st ? st[0] : '-'}</b><small>of ${S.players}</small></div>
     <div class="stat"><b>${me.marks.length}<span style="font-size:15px;color:var(--muted)">/24</span></b><small>marked</small></div>`;
-  const f = activeFreebie();
-  $('#banner').innerHTML = f ? `<div class="banner"><b>Your table won a free square!</b> Tap any open square, then tap it again to mark it.</div>` : '';
   $('#hint').textContent = S.left === 0 ? 'Every square has been called.' : `${S.drawCount} called · ${S.left} still in the bag`;
 
   const winner = S.wins[S.round];
@@ -147,8 +135,7 @@ function renderCard() {
   if (!grid) return;
   const called = calledSet();
   const marks = new Set(me.marks);
-  const f = activeFreebie();
-  const sig = [...marks].sort().join(',') + '|' + S.called.join(',') + '|' + (f ? f.id : '') + '|' + pick + '|' + stampCell;
+  const sig = [...marks].sort().join(',') + '|' + S.called.join(',') + '|' + stampCell;
   if (sig === renderCard.sig && grid.childElementCount) return; // don't swap tiles under a finger
   renderCard.sig = sig;
   grid.innerHTML = me.cells.map((sq, i) => {
@@ -156,7 +143,6 @@ function renderCard() {
     const cls = ['tile'];
     if (marks.has(i)) cls.push('marked');
     else if (called.has(sq)) cls.push('ready');
-    else if (f) { cls.push('pick'); if (pick === i) cls.push('sel'); }
     if (stampCell === i) cls.push('stamp');
     return `<div class="${cls.join(' ')}" data-cell="${i}" role="button">${esc(S.tiles[sq])}</div>`;
   }).join('');
@@ -170,17 +156,6 @@ async function onTile(e) {
   if (!tile || tile.classList.contains('free') || tile.classList.contains('marked')) return;
   const cell = parseInt(tile.dataset.cell, 10);
   if (tile.classList.contains('ready')) return markCell(cell);
-  const f = activeFreebie();
-  if (f) {
-    if (pick !== cell) { pick = cell; renderCard(); return; }
-    try {
-      const r = await api('free', { ...cred, freeId: f.id, cell });
-      me = r.player; pick = null; stampCell = cell; buzz(30);
-      toast(`Free square used on <b>${esc(S.labels[me.cells[cell]])}</b>.`);
-      renderAll();
-    } catch (err) { toast(esc(err.message)); }
-    return;
-  }
   toast(`<b>${esc(S.labels[me.cells[cell]])}</b> hasn't been called yet.`, 2200);
 }
 
@@ -229,7 +204,7 @@ function checkWins() {
     if (seenWins[k]) continue;
     seenWins[k] = true; keep('wins', seenWins);
     if (me && w.id === me.id) showMyWin(r);
-    else toast(`<b>BINGO!</b> ${esc(w.name)} (Table ${w.table}) won Round ${r}.`, 6000);
+    else toast(`<b>BINGO!</b> ${esc(w.name)} won Round ${r}.`, 6000);
   }
 }
 

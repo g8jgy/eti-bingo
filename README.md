@@ -5,14 +5,12 @@ host draws on the projector, players tap to mark, live leaderboard.
 
 ## How the game works
 
-- 36 squares in the bag (2026 launches, 2027 goals, GDI brands). Each card gets 24 of them in
+- 36 squares in the bag (2026 launches, 2027 goals and ETI-life classics like "Did you enter your hours?"). Each card gets 24 of them in
   its own order, with the yETI free square in the center.
 - The host draws a square. It shows big on the projector with a one-line caption, and glows on
   every phone that has it. Players tap it to mark it. Only called squares can be marked.
 - When a card completes the round's pattern, a BINGO button appears on that phone. The first
   press wins (checked on the server). One prize per person.
-- **Free square**: the host awards it to tables (for example Jeopardy winners). Everyone at
-  those tables taps any open square to mark it.
 - **Auto-draw** calls the next square every 10 to 30 seconds and pauses when someone wins.
 - Rounds (simulated with 70 players):
   | Round | Goal | First winner around |
@@ -26,11 +24,11 @@ host draws on the projector, players tap to mark, live leaderboard.
 
 | Path | Who | What |
 |---|---|---|
-| `/` | Players | Join (name + table) and play. `/?t=4` presets table 4. |
+| `/` | Players | Join with your name and play. Everyone plays against everyone. |
 | `/host` | Host laptop | Stage + control dock. Keys: D draw, A auto-draw, L leaderboard, Q join QR, G game, H hide dock, M mute. |
 | `/host?stage=1` | Projector (optional) | Stage only, no controls. |
 | `/review` | Host | All 36 squares with tile text and captions, printable. Needs the host key. |
-| `/tents?tables=10` | Host | Printable table cards with a QR per table. |
+| `/tents?count=10` | Host | Printable join QR cards, two per page, one per table. |
 
 ## Offline POC (one HTML file)
 

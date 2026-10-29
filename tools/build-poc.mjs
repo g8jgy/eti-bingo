@@ -95,7 +95,7 @@ function page(htmlFile, jsFile, seed, fix = (s) => s) {
 
 const hostPage = page('public/host.html', 'public/assets/host.js', { 'etibingo:hostkey': 'eti-host' }, (js) => {
   js = must(js, "const playUrl = location.origin + '/';", "const playUrl = 'POC: join on the phone panel';");
-  js = must(js, '<a href="/review" target="_blank">Review all squares</a> &middot; <a href="/tents?tables=${S.tables}" target="_blank">Print table QR tents</a> &middot; <a href="/host?stage=1" target="_blank">Stage-only view</a>',
+  js = must(js, '<a href="/review" target="_blank">Review all squares</a> &middot; <a href="/tents" target="_blank">Print join QR cards</a> &middot; <a href="/host?stage=1" target="_blank">Stage-only view</a>',
     'The squares review, table tents and stage-only view are in the full app.');
   return js;
 });
@@ -136,7 +136,7 @@ const shell = `<!doctype html>
   .hostbox { flex: 1; min-height: 0; display: grid; place-items: center; }
   #host { width: 100%; aspect-ratio: 16 / 9; max-height: 100%; border: 0; border-radius: 10px; background: #001F52; box-shadow: 0 8px 30px rgba(0,31,82,.25); }
   .phones { display: flex; gap: 14px; min-height: 0; flex: 1; max-height: 820px; }
-  .phone { width: 360px; flex: 0 0 auto; border: 10px solid #111; border-radius: 34px; overflow: hidden; background: #fff; box-shadow: 0 8px 30px rgba(0,0,0,.2); }
+  .phone { width: 410px; flex: 0 0 auto; border: 10px solid #111; border-radius: 34px; overflow: hidden; background: #fff; box-shadow: 0 8px 30px rgba(0,0,0,.2); }
   .phone iframe { width: 100%; height: 100%; border: 0; display: block; }
   @media (max-width: 1100px) { body { overflow: auto; } main { flex-direction: column; } .hostpane, .hostbox { flex: none; display: block; } .phones { flex: none; height: 760px; } #host { max-height: none; } }
 </style>
@@ -210,7 +210,7 @@ async function setBots(n) {
   while (bots.length < n) {
     const i = bots.length;
     const name = FIRST[i % FIRST.length] + ' ' + String.fromCharCode(65 + ((i * 7) % 26)) + '. (bot)';
-    const r = await BINGO.call('join', { name, table: 1 + (i % 10) });
+    const r = await BINGO.call('join', { name });
     if (r.status !== 200) break;
     bots.push({ pid: r.json.pid, token: r.json.token, cells: r.json.player.cells, marked: new Set(), pending: new Set(),
       react: rand(3, 12), miss: Math.random() * 0.25, won: 0, claiming: false });

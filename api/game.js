@@ -1,5 +1,5 @@
 // ETI Bingo API: one Vercel function, operations selected with ?op=
-// Public:  state (GET, CDN-cached ~1s), join, me, mark, claim, free
+// Public:  state (GET, CDN-cached ~1s), join, me, mark, claim
 // Host:    host-* operations, require the x-host-key header to match HOST_KEY.
 //
 // Classic bingo: the host draws a square, players tap it on their card if they have it,
@@ -16,7 +16,7 @@ const FAST = process.env.BINGO_FAST === '1' && backend === 'memory'; // load-tes
 const SPIN_MS = FAST ? 100 : 3500; // host spin animation before the square is revealed
 const HOST_KEY = process.env.HOST_KEY || (backend === 'memory' ? 'eti-host' : null);
 
-const newGame = () => ({ v: 1, status: 'lobby', round: 1, tables: 10, draws: [], freebies: [], created: Date.now() });
+const newGame = () => ({ v: 1, status: 'lobby', round: 1, draws: [], created: Date.now() });
 
 class HttpError extends Error { constructor(code, msg) { super(msg); this.code = code; } }
 const bad = (msg, code = 400) => { throw new HttpError(code, msg); };
@@ -31,7 +31,7 @@ async function saveGame(game) {
   game.v = (game.v || 0) + 1;
   await exec([['SET', K.game, JSON.stringify(game)]]);
 }
-const summary = (p) => ({ id: p.id, n: p.n, t: p.t, k: p.cells, m: p.m, w: p.w, lm: p.lm || 0 });
+const summary = (p) => ({ id: p.id, n: p.n, k: p.cells, m: p.m, w: p.w, lm: p.lm || 0 });
 async function savePlayer(p) {
   await exec([['HSET', K.players, p.id, JSON.stringify(p)], ['HSET', K.sums, p.id, JSON.stringify(summary(p))]]);
 }
@@ -41,7 +41,7 @@ async function authPlayer(body) {
   if (!p || p.tok !== body.token) bad('Card not found. Rejoin from the QR code.', 401);
   return p;
 }
-const publicPlayer = (p) => ({ id: p.id, name: p.n, table: p.t, cells: p.cells, marks: p.m, free: p.free, won: p.w });
+const publicPlayer = (p) => ({ id: p.id, name: p.n, cells: p.cells, marks: p.m, won: p.w });
 
 // Squares that have been revealed (the newest draw is hidden while the host screen spins).
 const calledSet = (game, now) => new Set(game.draws.filter((d) => now >= d.at).map((d) => d.sq));
@@ -71,14 +71,14 @@ async function state() {
     const w = parse(raw);
     if (!w) return;
     const s = byId[w.id];
-    wins[i + 1] = { id: w.id, name: s ? s.n : 'Player', table: s ? s.t : null, at: w.at };
+    wins[i + 1] = { id: w.id, name: s ? s.n : 'Player', at: w.at };
   });
   const called = game.draws.filter((d) => now >= d.at).map((d) => d.sq);
   return {
     now, v: game.v, status: game.status, round: game.round, goal: goal.key, goalLabel: goal.label,
-    tables: game.tables, drawCount: called.length, called, left: SQUARES.length - called.length,
-    current, freebies: game.freebies, wins, players: sums.length,
-    top: rows.slice(0, 10).map((r) => ({ id: r.id, name: r.name, table: r.table, toGo: r.toGo, marks: r.marks, won: r.won })),
+    drawCount: called.length, called, left: SQUARES.length - called.length,
+    current, wins, players: sums.length,
+    top: rows.slice(0, 10).map((r) => ({ id: r.id, name: r.name, toGo: r.toGo, marks: r.marks, won: r.won })),
     st: Object.fromEntries(rows.map((r) => [r.id, [r.rank, r.toGo, r.marks]])),
     labels: SQUARES.map((s) => s.label),
     tiles: SQUARES.map((s) => s.tile),
@@ -87,13 +87,10 @@ async function state() {
 
 // ------------------------------------------------------------ player ops
 async function join(body) {
-  const game = await loadGame();
   const name = String(body.name || '').replace(/[\u0000-\u001f<>]/g, '').replace(/\s+/g, ' ').trim().slice(0, 32);
-  const table = parseInt(body.table, 10);
   if (name.length < 2) bad('Please enter your name.');
-  if (!(table >= 1 && table <= game.tables)) bad('Pick your table number.');
   const pid = id(8);
-  const p = { id: pid, tok: id(18), n: name, t: table, cells: makeCells(pid + ':' + P, SQUARES.length), m: [], free: {}, w: 0, at: Date.now() };
+  const p = { id: pid, tok: id(18), n: name, cells: makeCells(pid + ':' + P, SQUARES.length), m: [], w: 0, at: Date.now() };
   await savePlayer(p);
   return { pid, token: p.tok, player: publicPlayer(p), now: Date.now() };
 }
@@ -130,21 +127,6 @@ async function claim(body) {
   p.w = game.round;
   await savePlayer(p);
   return { won: game.round, player: publicPlayer(p) };
-}
-
-async function free(body) {
-  const game = await loadGame();
-  const p = await authPlayer(body);
-  const f = game.freebies.find((x) => x.id === body.freeId);
-  if (!f || !f.tables.includes(p.t)) bad('No free square for your table.', 409);
-  if (p.free[f.id] != null) bad('You already used this free square.', 409);
-  const cell = parseInt(body.cell, 10);
-  if (!(cell >= 0 && cell < 25) || cell === CENTER || p.m.includes(cell)) bad('Pick an open square.');
-  p.m.push(cell);
-  p.free[f.id] = cell;
-  p.lm = Date.now();
-  await savePlayer(p);
-  return { player: publicPlayer(p) };
 }
 
 // ------------------------------------------------------------ host ops
@@ -189,7 +171,7 @@ async function crown(game, sums, round) {
   if (ok !== 'OK') return null;
   p.w = round;
   await savePlayer(p);
-  return { id: p.id, name: p.n, table: p.t };
+  return { id: p.id, name: p.n };
 }
 
 async function hostRound(body) {
@@ -220,22 +202,11 @@ async function hostClearWin(body) {
   return { cleared: round };
 }
 
-async function hostFree(body) {
-  const game = await loadGame();
-  const tables = [...new Set((body.tables || []).map((t) => parseInt(t, 10)).filter((t) => t >= 1 && t <= game.tables))];
-  if (!tables.length) bad('Pick at least one table.');
-  const f = { id: 'f' + (game.freebies.length + 1), tables, at: Date.now(), label: String(body.label || '').slice(0, 40) };
-  game.freebies.push(f);
-  await saveGame(game);
-  return { freebie: f };
-}
-
 async function hostSettings(body) {
   const game = await loadGame();
-  if (body.tables != null) game.tables = Math.max(1, Math.min(30, parseInt(body.tables, 10) || 10));
   if (body.status && ['lobby', 'live', 'ended'].includes(body.status)) game.status = body.status;
   await saveGame(game);
-  return { tables: game.tables, status: game.status };
+  return { status: game.status };
 }
 
 async function hostKick(body) {
@@ -248,7 +219,7 @@ async function hostReset(body) {
   const keep = await loadGame();
   await exec([['DEL', K.game, K.players, K.sums, K.win(1), K.win(2), K.win(3)]]);
   const g = newGame();
-  g.tables = keep.tables; g.v = (keep.v || 0) + 1;
+  g.v = (keep.v || 0) + 1;
   await exec([['SET', K.game, JSON.stringify(g)]]);
   return { reset: true };
 }
@@ -260,12 +231,12 @@ async function hostPlayers() {
 
 const HOST = {
   'host-draw': hostDraw, 'host-undo': hostUndo, 'host-round': hostRound, 'host-crown': hostCrown,
-  'host-clear-win': hostClearWin, 'host-free': hostFree, 'host-settings': hostSettings, 'host-kick': hostKick,
+  'host-clear-win': hostClearWin, 'host-settings': hostSettings, 'host-kick': hostKick,
   'host-reset': hostReset, 'host-players': hostPlayers,
   'host-content': async () => ({ squares: SQUARES }),
   'host-check': async () => ({ ok: true, backend }),
 };
-const PLAYER = { join, me, mark, claim, free };
+const PLAYER = { join, me, mark, claim };
 
 export default async function handler(req, res) {
   const op = String((req.query && req.query.op) || '');
