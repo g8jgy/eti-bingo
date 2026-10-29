@@ -190,7 +190,7 @@ function showMyWin(round) {
   seenWins[`${round}:${me.id}`] = true; keep('wins', seenWins);
   const win = $('#win');
   win.innerHTML = `<div class="mark" style="width:72px;height:72px;background:#fff;border-radius:16px;padding:7px;margin-bottom:16px">${LOGO}</div>
-    <h2>BINGO!</h2><p>You won <b>Round ${round}</b>. Head to the front to claim your prize.</p>
+    <h2>BINGO!</h2><p>You won <b>Round ${round}</b>. We'll reach out about your prize.</p>
     <button class="btn" id="winOk">Back to my card</button>`;
   win.classList.add('show');
   confetti(document.body);
@@ -224,8 +224,10 @@ async function refreshMe() {
     const r = await api('me', cred);
     syncClock(r.now, 1);
     const local = new Set(me ? me.marks : []);
+    const newRound = me && me.round !== r.player.round;
     me = r.player;
-    for (const c of pending) if (local.has(c) && !me.marks.includes(c)) me.marks.push(c);
+    if (newRound) { pending.clear(); renderCard.sig = ''; toast(`<b>Round ${me.round}: fresh card!</b> New squares, new chances.`, 5000); }
+    else for (const c of pending) if (local.has(c) && !me.marks.includes(c)) me.marks.push(c);
   } catch (err) {
     if (err.status === 401) { cred = null; keep('cred', null); me = null; renderJoin('Your card was reset. Please join again.'); }
   }

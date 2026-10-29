@@ -5,7 +5,7 @@ host draws on the projector, players tap to mark, live leaderboard.
 
 ## How the game works
 
-- 36 squares in the bag (2026 launches, 2027 goals and ETI-life classics like "Did you enter your hours?"). Each card gets 24 of them in
+- 43 squares: 22 projects and 21 ETI-life classics like "Did you enter your hours?". Each round plays 36 (all projects + 14 classics, rotating 7 per round) and deals everyone a fresh card. Each card gets 24 of them in
   its own order, with the yETI free square in the center.
 - The host draws a square. It shows big on the projector with a one-line caption, and glows on
   every phone that has it. Players tap it to mark it. Only called squares can be marked.

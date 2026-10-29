@@ -132,8 +132,8 @@ function tickStage(p) {
   reelSlow++;
   const every = left > 2000 ? 1 : left > 1000 ? 2 : 4;
   if (r && reelSlow % every === 0) {
-    reelI = (reelI + 1) % S.labels.length;
-    r.textContent = S.labels[reelI];
+    reelI = (reelI + 1) % S.pool.length;
+    r.textContent = S.labels[S.pool[reelI]];
     sfx.tick();
   }
 }
@@ -154,8 +154,8 @@ function renderChrome() {
     <span class="pill">${S.drawCount} drawn</span>`;
   const now_ = S.current ? S.current.sq : null;
   const called = new Set(S.called);
-  $('#called').innerHTML = S.tiles.map((l, i) => `<div class="${i === now_ ? 'now' : called.has(i) ? 'on' : ''}">${esc(l)}</div>`).join('');
-  $('#calledN').textContent = `${S.called.length}/${S.labels.length}`;
+  $('#called').innerHTML = S.pool.map((i) => `<div class="${i === now_ ? 'now' : called.has(i) ? 'on' : ''}">${esc(S.tiles[i])}</div>`).join('');
+  $('#calledN').textContent = `${S.called.length}/${S.pool.length}`;
   $('#goalS').textContent = S.goalLabel;
   $('#lb').innerHTML = S.top.slice(0, 6).map((r, i) => `<li><span class="r">${i + 1}</span><span class="n">${esc(r.name)}</span><span class="g ${r.toGo === 1 && !r.won ? 'one' : ''}">${r.won ? 'Won R' + r.won : r.toGo === 0 ? 'BINGO' : r.toGo + ' to go'}</span></li>`).join('')
     || '<li style="grid-template-columns:1fr;color:#9fb2d4">Waiting for players</li>';
@@ -228,10 +228,10 @@ const actions = {
   round: (b) => {
     const r = parseInt(b.dataset.r, 10);
     if (S.round === r) return;
-    modal(`<h2>Start Round ${r}?</h2><p>The goal becomes <b>${({ 1: 'Any line', 2: 'Two lines', 3: 'Full card' })[r]}</b>. Anyone who already has it can press BINGO right away. Previous winners cannot win again.</p>
+    modal(`<h2>Start Round ${r}?</h2><p>The goal becomes <b>${({ 1: 'Any line', 2: 'Two lines', 3: 'Full card' })[r]}</b>. Everyone gets a fresh card with a new mix of squares, and the draws start over. Previous winners cannot win again.</p>
       <div class="row"><button class="primary" id="ok">Start Round ${r}</button><button id="no">Cancel</button></div>`, (p) => {
       $('#no', p).onclick = closeModal;
-      $('#ok', p).onclick = async () => { closeModal(); const res = await host('host-round', { round: r }); if (res.autoWinner) flash(`${res.autoWinner.name} already had it!`); };
+      $('#ok', p).onclick = async () => { closeModal(); await host('host-round', { round: r }); flash(`Round ${r}: fresh cards dealt`); };
     });
   },
   crown: () => modal(`<h2>Crown the leader?</h2><p>Awards Round ${S.round} to the top eligible player on the leaderboard right now (use it if nobody claims before time runs out). Leader: <b>${esc((S.top.find((r) => !r.won) || {}).name || 'nobody yet')}</b>.</p>

@@ -36,11 +36,12 @@
   const app = document.getElementById('app');
   async function show(key) {
     try {
-      const { squares } = await api('host-content', {}, key);
+      const { squares, rounds } = await api('host-content', {}, key);
+      const inR = (n) => [1, 2, 3].filter((r) => rounds[r].includes(n));
       localStorage.setItem('etibingo:hostkey', key);
       app.innerHTML = `<h1>ETI <span>Bingo</span> squares</h1>
-        <p class="lead">${squares.length} squares in the bag. Each card gets 24 of them in a random order. The caption shows on the big screen when a square is called. <a class="noprint" href="javascript:print()">Print</a></p>
-        ${squares.map((s, n) => `<div class="sq"><h2>${n + 1}. ${esc(s.label)}</h2><div class="q"><div class="lab">Card tile</div><p>${esc(s.tile.replace(/­/g, ""))}</p><div class="fact">Caption: ${esc(s.caption)}</div></div></div>`).join("")}`;
+        <p class="lead">${squares.length} squares. Each round plays 36 of them: every project, plus 14 of the ETI-life squares, which rotate each round. Everyone gets a fresh card of 24 each round. The caption shows on the big screen when a square is called. <a class="noprint" href="javascript:print()">Print</a></p>
+        ${squares.map((s, n) => `<div class="sq"><h2>${n + 1}. ${esc(s.label)}</h2><div class="lab">${s.life ? 'ETI life, rounds ' + inR(n).join(' and ') : 'Project, every round'}</div><div class="q"><div class="lab">Card tile</div><p>${esc(s.tile.replace(/­/g, ""))}</p><div class="fact">Caption: ${esc(s.caption)}</div></div></div>`).join("")}`;
     } catch (e) { gate(e.message); }
   }
   function gate(err = '') {

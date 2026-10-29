@@ -72,8 +72,11 @@ for (let n = 1; n <= 36; n++) {
     const w = s.wins[round];
     winsAt[round] = n;
     console.log(`ROUND ${round} (${goals[round]}) won on draw ${n} by ${w.name}; ${ready.length} pressed BINGO at once`);
-    if (round < 3) { round++; await call('host-round', { round }, true); }
-    else break;
+    if (round < 3) {
+      round++; n = 0;
+      await call('host-round', { round }, true);
+      await Promise.all(players.map(async (p) => { const r = await call('me', { pid: p.pid, token: p.token }); p.cells = r.player.cells; p.marks = r.player.marks; }));
+    } else break;
   }
 }
 // a past winner cannot win again
@@ -81,6 +84,6 @@ const pastWinner = players.find((p) => p.won);
 try { await call('claim', { pid: pastWinner.pid, token: pastWinner.token }); stats.errors.push('past winner claimed again'); } catch { /* expected */ }
 
 const s = await call('state');
-console.log(`draws: ${s.drawCount}, wins at draws: ${JSON.stringify(winsAt)}, players: ${s.players}`);
+console.log(`draws this round: ${s.drawCount}, wins at draws (counted per round): ${JSON.stringify(winsAt)}, players: ${s.players}`);
 console.log(`calls: ${stats.calls}, slowest: ${stats.maxMs} ms, largest state payload: ${(stats.stateBytes / 1024).toFixed(1)} KB`);
 console.log(stats.errors.length ? `ERRORS (${stats.errors.length}):\n  ` + [...new Set(stats.errors)].slice(0, 15).join('\n  ') : 'no errors');

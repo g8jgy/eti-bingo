@@ -3,11 +3,12 @@
 // Host:    host-* operations, require the x-host-key header to match HOST_KEY.
 //
 // Classic bingo: the host draws a square, players tap it on their card if they have it,
-// and the first player to press BINGO with the round's pattern complete wins.
+// and the first player to press BINGO with the round's pattern complete wins. Every round has its
+// own bag (roundPool) and deals everyone a fresh card; marks from earlier rounds are kept per round.
 
 import crypto from 'node:crypto';
 import { exec, hashToObj, backend } from '../lib/store.js';
-import { SQUARES } from '../lib/content.js';
+import { SQUARES, roundPool, POOL_SIZE } from '../lib/content.js';
 import { GOALS, makeCells, toGo, standings, shuffle, CENTER } from '../lib/engine.js';
 
 const P = process.env.BINGO_PREFIX || 'etibingo:q4-2026';
@@ -41,10 +42,24 @@ async function authPlayer(body) {
   if (!p || p.tok !== body.token) bad('Card not found. Rejoin from the QR code.', 401);
   return p;
 }
-const publicPlayer = (p) => ({ id: p.id, name: p.n, cells: p.cells, marks: p.m, won: p.w });
+const publicPlayer = (p) => ({ id: p.id, name: p.n, round: p.r, cells: p.cells, marks: p.m, won: p.w });
+
+// Deal the player's card for a round (seeded, so the same player always gets the same card for a
+// round). Marks for the round they leave are kept in p.rounds. Returns true if anything changed.
+function deal(p, round) {
+  if (p.r === round && p.cells) return false;
+  p.rounds = p.rounds || {};
+  if (p.r) p.rounds[p.r] = p.m || [];
+  const pool = roundPool(round);
+  p.cells = makeCells(p.id + ':' + P + ':r' + round, POOL_SIZE).map((i) => (i < 0 ? -1 : pool[i]));
+  p.m = p.rounds[round] || [];
+  p.r = round;
+  return true;
+}
+const inRound = (game) => game.draws.filter((d) => (d.r || 1) === game.round);
 
 // Squares that have been revealed (the newest draw is hidden while the host screen spins).
-const calledSet = (game, now) => new Set(game.draws.filter((d) => now >= d.at).map((d) => d.sq));
+const calledSet = (game, now) => new Set(inRound(game).filter((d) => now >= d.at).map((d) => d.sq));
 
 // ------------------------------------------------------------ public state
 async function state() {
@@ -56,7 +71,8 @@ async function state() {
   const rows = standings(sums, goal.key);
   const byId = Object.fromEntries(sums.map((s) => [s.id, s]));
 
-  const last = game.draws[game.draws.length - 1] || null;
+  const draws = inRound(game);
+  const last = draws[draws.length - 1] || null;
   let current = null;
   if (last) {
     const live = now >= last.at;
@@ -73,10 +89,10 @@ async function state() {
     const s = byId[w.id];
     wins[i + 1] = { id: w.id, name: s ? s.n : 'Player', at: w.at };
   });
-  const called = game.draws.filter((d) => now >= d.at).map((d) => d.sq);
+  const called = draws.filter((d) => now >= d.at).map((d) => d.sq);
   return {
     now, v: game.v, status: game.status, round: game.round, goal: goal.key, goalLabel: goal.label,
-    drawCount: called.length, called, left: SQUARES.length - called.length,
+    drawCount: called.length, called, left: POOL_SIZE - called.length, pool: roundPool(game.round),
     current, wins, players: sums.length,
     top: rows.slice(0, 10).map((r) => ({ id: r.id, name: r.name, toGo: r.toGo, marks: r.marks, won: r.won })),
     st: Object.fromEntries(rows.map((r) => [r.id, [r.rank, r.toGo, r.marks]])),
@@ -89,14 +105,18 @@ async function state() {
 async function join(body) {
   const name = String(body.name || '').replace(/[\u0000-\u001f<>]/g, '').replace(/\s+/g, ' ').trim().slice(0, 32);
   if (name.length < 2) bad('Please enter your name.');
+  const game = await loadGame();
   const pid = id(8);
-  const p = { id: pid, tok: id(18), n: name, cells: makeCells(pid + ':' + P, SQUARES.length), m: [], w: 0, at: Date.now() };
+  const p = { id: pid, tok: id(18), n: name, m: [], w: 0, at: Date.now() };
+  deal(p, game.round);
   await savePlayer(p);
   return { pid, token: p.tok, player: publicPlayer(p), now: Date.now() };
 }
 
 async function me(body) {
+  const game = await loadGame();
   const p = await authPlayer(body);
+  if (deal(p, game.round)) await savePlayer(p);
   return { player: publicPlayer(p), now: Date.now() };
 }
 
@@ -107,6 +127,7 @@ async function mark(body) {
   const game = parse(g) || newGame();
   const p = parse(raw);
   if (!p || p.tok !== body.token) bad('Card not found. Rejoin from the QR code.', 401);
+  if (deal(p, game.round)) { await savePlayer(p); bad('New round, new card! Look again.', 409); }
   const cell = parseInt(body.cell, 10);
   if (!(cell >= 0 && cell < 25) || cell === CENTER) bad('Pick a square.');
   if (!calledSet(game, now).has(p.cells[cell])) bad("That square hasn't been called yet.", 409);
@@ -120,6 +141,7 @@ async function claim(body) {
   const game = await loadGame();
   const p = await authPlayer(body);
   const goal = GOALS[game.round];
+  if (deal(p, game.round)) { await savePlayer(p); bad('New round, new card! Look again.', 409); }
   if (p.w) bad(`You already won Round ${p.w}. Let someone else have a turn!`, 409);
   if (toGo(goal.key, p.m) > 0) bad(`Not yet! You need ${goal.label.toLowerCase()} for Round ${game.round}.`, 409);
   const [ok] = await exec([['SET', K.win(game.round), JSON.stringify({ id: p.id, at: now }), 'NX']]);
@@ -140,11 +162,12 @@ async function hostDraw() {
   const game = await loadGame();
   const last = game.draws[game.draws.length - 1];
   if (last && now < last.at) bad('Still drawing.', 409);
-  const drawn = new Set(game.draws.map((x) => x.sq));
-  const fresh = [...SQUARES.keys()].filter((i) => !drawn.has(i));
+  const drawn = new Set(inRound(game).map((x) => x.sq));
+  const fresh = roundPool(game.round).filter((i) => !drawn.has(i));
   if (!fresh.length) bad('Every square has been called.', 409);
   const sq = shuffle(fresh)[0];
-  const d = { id: 'd' + (game.draws.length + 1) + '-' + id(3), n: game.draws.length + 1, sq, at: now + SPIN_MS };
+  const n = drawn.size + 1;
+  const d = { id: 'd' + game.round + '-' + n + '-' + id(3), r: game.round, n, sq, at: now + SPIN_MS };
   game.draws.push(d);
   game.status = 'live';
   await saveGame(game);
@@ -153,8 +176,9 @@ async function hostDraw() {
 
 async function hostUndo() {
   const game = await loadGame();
-  const d = game.draws.pop();
-  if (!d) bad('Nothing to undo.');
+  const last = inRound(game).pop();
+  if (!last) bad('Nothing to undo this round.');
+  const d = game.draws.splice(game.draws.lastIndexOf(last), 1)[0];
   await saveGame(game);
   return { undone: SQUARES[d.sq].label, note: 'Players who already marked it keep the mark.' };
 }
@@ -177,10 +201,16 @@ async function crown(game, sums, round) {
 async function hostRound(body) {
   const round = parseInt(body.round, 10);
   if (!GOALS[round]) bad('Round must be 1, 2 or 3.');
-  const game = await loadGame();
+  const [g, playersFlat] = await exec([['GET', K.game], ['HGETALL', K.players]]);
+  const game = parse(g) || newGame();
+  const writes = [];
+  for (const p of Object.values(hashToObj(playersFlat)).map(parse)) {
+    if (deal(p, round)) writes.push(['HSET', K.players, p.id, JSON.stringify(p)], ['HSET', K.sums, p.id, JSON.stringify(summary(p))]);
+  }
+  if (writes.length) await exec(writes);
   game.round = round;
   await saveGame(game);
-  return { round };
+  return { round, dealt: writes.length / 2 };
 }
 
 async function hostCrown() {
@@ -233,7 +263,7 @@ const HOST = {
   'host-draw': hostDraw, 'host-undo': hostUndo, 'host-round': hostRound, 'host-crown': hostCrown,
   'host-clear-win': hostClearWin, 'host-settings': hostSettings, 'host-kick': hostKick,
   'host-reset': hostReset, 'host-players': hostPlayers,
-  'host-content': async () => ({ squares: SQUARES }),
+  'host-content': async () => ({ squares: SQUARES, rounds: { 1: roundPool(1), 2: roundPool(2), 3: roundPool(3) } }),
   'host-check': async () => ({ ok: true, backend }),
 };
 const PLAYER = { join, me, mark, claim };

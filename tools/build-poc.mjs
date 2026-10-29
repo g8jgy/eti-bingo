@@ -212,7 +212,7 @@ async function setBots(n) {
     const name = FIRST[i % FIRST.length] + ' ' + String.fromCharCode(65 + ((i * 7) % 26)) + '. (bot)';
     const r = await BINGO.call('join', { name });
     if (r.status !== 200) break;
-    bots.push({ pid: r.json.pid, token: r.json.token, cells: r.json.player.cells, marked: new Set(), pending: new Set(),
+    bots.push({ pid: r.json.pid, token: r.json.token, round: r.json.player.round, cells: r.json.player.cells, marked: new Set(), pending: new Set(),
       react: rand(3, 12), miss: Math.random() * 0.25, won: 0, claiming: false });
   }
   status();
@@ -231,11 +231,17 @@ async function tick() {
       b.pending.add(cell);
       const late = Math.random() < b.miss ? rand(15, 45) : 0;
       setTimeout(async () => {
-        if (b.gone) return;
+        if (b.gone || !b.pending.has(cell)) return;
         const r = await BINGO.call('mark', { pid: b.pid, token: b.token, cell });
         if (r.status === 200) b.marked.add(cell);
         b.pending.delete(cell);
       }, (b.react * rand(0.5, 1.5) + late) * 1000 * speed);
+    }
+    if (b.round !== S.round) {
+      b.round = S.round;
+      const r = await BINGO.call('me', { pid: b.pid, token: b.token });
+      if (r.status === 200) { b.cells = r.json.player.cells; b.marked = new Set(r.json.player.marks); b.pending = new Set(); }
+      continue;
     }
     const st = S.st[b.pid];
     if (!b.won && !b.claiming && !S.wins[S.round] && st && st[1] === 0) {
