@@ -171,9 +171,11 @@ function checkWins() {
     showWinner(r, w);
   }
 }
+const roundNums = () => (S && S.goals ? Object.keys(S.goals).map(Number) : [1, 2, 3, 4, 5]);
+
 function showWinner(r, w) {
   const el = $('#winner');
-  el.innerHTML = `<div class="eyebrow">Round ${r} &middot; ${esc(({ 1: 'Any line', 2: 'Two lines', 3: 'Full card' })[r])}</div>
+  el.innerHTML = `<div class="eyebrow">Round ${r} &middot; ${esc(S.goals[r].label)}</div>
     <div class="big">BINGO!</div><div class="who">${esc(w.name)}</div>
     <div class="hintx">Click or press Enter to continue</div>`;
   el.classList.add('show'); winnerUp = true;
@@ -199,7 +201,7 @@ function renderDock() {
     <button data-a="board" class="${view === 'board' ? 'on' : ''}">Leaderboard<kbd>L</kbd></button>
     <button data-a="lobby" class="${view === 'lobby' ? 'on' : ''}">Join QR<kbd>Q</kbd></button>
     <span class="sep"></span>
-    ${[1, 2, 3].map((r) => `<button data-a="round" data-r="${r}" class="${S && S.round === r ? 'on' : ''}">R${r}</button>`).join('')}
+    ${roundNums().map((r) => `<button data-a="round" data-r="${r}" class="${S && S.round === r ? 'on' : ''}">R${r}</button>`).join('')}
     <button data-a="crown">Crown leader</button>
     <span class="sep"></span>
     <button data-a="more">More</button>
@@ -228,7 +230,7 @@ const actions = {
   round: (b) => {
     const r = parseInt(b.dataset.r, 10);
     if (S.round === r) return;
-    modal(`<h2>Start Round ${r}?</h2><p>The goal becomes <b>${({ 1: 'Any line', 2: 'Two lines', 3: 'Full card' })[r]}</b>. Everyone gets a fresh card with a new mix of squares, and the draws start over. Previous winners cannot win again.</p>
+    modal(`<h2>Start Round ${r}?</h2><p>The goal becomes <b>${esc(S.goals[r].label)}</b>. Everyone gets a fresh card with a new mix of squares, and the draws start over. Previous winners cannot win again.</p>
       <div class="row"><button class="primary" id="ok">Start Round ${r}</button><button id="no">Cancel</button></div>`, (p) => {
       $('#no', p).onclick = closeModal;
       $('#ok', p).onclick = async () => { closeModal(); await host('host-round', { round: r }); flash(`Round ${r}: fresh cards dealt`); };
@@ -255,7 +257,7 @@ async function openMore() {
   try { players = (await api('host-players', {}, hostKey)).players; } catch (e) { flash(e.message); }
   modal(`<h2>Game settings</h2>
     <div class="row"><a href="/review" target="_blank">Review all squares</a> &middot; <a href="/tents" target="_blank">Print join QR cards</a> &middot; <a href="/host?stage=1" target="_blank">Stage-only view</a></div>
-    <div class="row">Winners: ${[1, 2, 3].map((r) => S.wins[r] ? `<button class="danger" data-clear="${r}">Clear R${r}: ${esc(S.wins[r].name)}</button>` : `<span style="color:var(--muted)">R${r}: none</span>`).join(' ')}</div>
+    <div class="row">Winners: ${roundNums().map((r) => S.wins[r] ? `<button class="danger" data-clear="${r}">Clear R${r}: ${esc(S.wins[r].name)}</button>` : `<span style="color:var(--muted)">R${r}: none</span>`).join(' ')}</div>
     <h2 style="font-size:20px;margin-top:14px">Players (${players.length})</h2>
     <table><tr><th>#</th><th>Name</th><th>Marked</th><th>To go</th><th></th></tr>
     ${players.map((p) => `<tr><td>${p.rank}</td><td>${esc(p.name)}</td><td>${p.marks}</td><td>${p.toGo}</td><td><button class="danger" data-kick="${p.id}">Remove</button></td></tr>`).join('')}</table>

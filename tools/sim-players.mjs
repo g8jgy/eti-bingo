@@ -46,7 +46,7 @@ try { await call('host-draw', {}); stats.errors.push('draw without host key'); }
 
 const winsAt = {};
 let round = 1;
-const goals = { 1: 'line', 2: 'twoLines', 3: 'blackout' };
+const { goals } = await call('state');
 for (let n = 1; n <= 36; n++) {
   await call('host-draw', {}, true);
   let s = await call('state');
@@ -62,7 +62,7 @@ for (let n = 1; n <= 36; n++) {
   }));
 
   // everyone who can press BINGO does, at the same moment
-  const ready = players.filter((p) => !p.won && done(goals[round], p.marks));
+  const ready = players.filter((p) => !p.won && done(goals[round].key, p.marks));
   if (ready.length) {
     const results = await Promise.allSettled(ready.map((p) => call('claim', { pid: p.pid, token: p.token })));
     const winners = results.filter((r) => r.status === 'fulfilled');
@@ -71,8 +71,8 @@ for (let n = 1; n <= 36; n++) {
     s = await call('state');
     const w = s.wins[round];
     winsAt[round] = n;
-    console.log(`ROUND ${round} (${goals[round]}) won on draw ${n} by ${w.name}; ${ready.length} pressed BINGO at once`);
-    if (round < 3) {
+    console.log(`ROUND ${round} (${goals[round].label}) won on draw ${n} by ${w.name}; ${ready.length} pressed BINGO at once`);
+    if (round < Object.keys(goals).length) {
       round++; n = 0;
       await call('host-round', { round }, true);
       await Promise.all(players.map(async (p) => { const r = await call('me', { pid: p.pid, token: p.token }); p.cells = r.player.cells; p.marks = r.player.marks; }));

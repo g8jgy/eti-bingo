@@ -9,7 +9,7 @@
 import crypto from 'node:crypto';
 import { exec, hashToObj, backend } from '../lib/store.js';
 import { SQUARES, roundPool, POOL_SIZE } from '../lib/content.js';
-import { GOALS, makeCells, toGo, standings, shuffle, CENTER } from '../lib/engine.js';
+import { GOALS, ROUNDS, makeCells, toGo, standings, shuffle, CENTER } from '../lib/engine.js';
 
 const P = process.env.BINGO_PREFIX || 'etibingo:q4-2026';
 const K = { game: P + ':game', players: P + ':players', sums: P + ':sums', win: (r) => P + ':win:' + r };
@@ -64,7 +64,7 @@ const calledSet = (game, now) => new Set(inRound(game).filter((d) => now >= d.at
 // ------------------------------------------------------------ public state
 async function state() {
   const now = Date.now();
-  const [g, sumsFlat, w1, w2, w3] = await exec([['GET', K.game], ['HGETALL', K.sums], ['GET', K.win(1)], ['GET', K.win(2)], ['GET', K.win(3)]]);
+  const [g, sumsFlat, ...winsRaw] = await exec([['GET', K.game], ['HGETALL', K.sums], ...ROUNDS.map((r) => ['GET', K.win(r)])]);
   const game = parse(g) || newGame();
   const sums = Object.values(hashToObj(sumsFlat)).map(parse);
   const goal = GOALS[game.round] || GOALS[1];
@@ -83,7 +83,7 @@ async function state() {
     };
   }
   const wins = {};
-  [w1, w2, w3].forEach((raw, i) => {
+  winsRaw.forEach((raw, i) => {
     const w = parse(raw);
     if (!w) return;
     const s = byId[w.id];
@@ -92,6 +92,7 @@ async function state() {
   const called = draws.filter((d) => now >= d.at).map((d) => d.sq);
   return {
     now, v: game.v, status: game.status, round: game.round, goal: goal.key, goalLabel: goal.label,
+    goals: Object.fromEntries(ROUNDS.map((r) => [r, { key: GOALS[r].key, label: GOALS[r].label }])),
     drawCount: called.length, called, left: POOL_SIZE - called.length, pool: roundPool(game.round),
     current, wins, players: sums.length,
     top: rows.slice(0, 10).map((r) => ({ id: r.id, name: r.name, toGo: r.toGo, marks: r.marks, won: r.won })),
@@ -200,7 +201,7 @@ async function crown(game, sums, round) {
 
 async function hostRound(body) {
   const round = parseInt(body.round, 10);
-  if (!GOALS[round]) bad('Round must be 1, 2 or 3.');
+  if (!GOALS[round]) bad(`Round must be 1 to ${ROUNDS.length}.`);
   const [g, playersFlat] = await exec([['GET', K.game], ['HGETALL', K.players]]);
   const game = parse(g) || newGame();
   const writes = [];
@@ -247,7 +248,7 @@ async function hostKick(body) {
 async function hostReset(body) {
   if (body.confirm !== 'RESET') bad('Type RESET to confirm.');
   const keep = await loadGame();
-  await exec([['DEL', K.game, K.players, K.sums, K.win(1), K.win(2), K.win(3)]]);
+  await exec([['DEL', K.game, K.players, K.sums, ...ROUNDS.map(K.win)]]);
   const g = newGame();
   g.v = (keep.v || 0) + 1;
   await exec([['SET', K.game, JSON.stringify(g)]]);
@@ -263,7 +264,7 @@ const HOST = {
   'host-draw': hostDraw, 'host-undo': hostUndo, 'host-round': hostRound, 'host-crown': hostCrown,
   'host-clear-win': hostClearWin, 'host-settings': hostSettings, 'host-kick': hostKick,
   'host-reset': hostReset, 'host-players': hostPlayers,
-  'host-content': async () => ({ squares: SQUARES, rounds: { 1: roundPool(1), 2: roundPool(2), 3: roundPool(3) } }),
+  'host-content': async () => ({ squares: SQUARES, rounds: Object.fromEntries(ROUNDS.map((r) => [r, roundPool(r)])) }),
   'host-check': async () => ({ ok: true, backend }),
 };
 const PLAYER = { join, me, mark, claim };

@@ -12,12 +12,9 @@ host draws on the projector, players tap to mark, live leaderboard.
 - When a card completes the round's pattern, a BINGO button appears on that phone. The first
   press wins (checked on the server). One prize per person.
 - **Auto-draw** calls the next square every 10 to 30 seconds and pauses when someone wins.
-- Rounds (simulated with 70 players):
-  | Round | Goal | First winner around |
-  |---|---|---|
-  | 1 | Any line | draw 6 to 11 |
-  | 2 | Two lines | draw 15 to 17 |
-  | 3 | Full card | draw 33 to 34 |
+- **Five rounds**, one per bingo break on the agenda, about five minutes each. Every round deals a
+  fresh card and is won by the first complete line (simulated with 70 players: around draw 7 to 13
+  of the round). Keep Auto-draw at 15 seconds to fit five minutes.
 - **Crown leader** awards the round to whoever is closest if time runs out.
 
 ## Pages

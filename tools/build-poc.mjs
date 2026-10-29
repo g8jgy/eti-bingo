@@ -94,7 +94,10 @@ function page(htmlFile, jsFile, seed, fix = (s) => s) {
 }
 
 const hostPage = page('public/host.html', 'public/assets/host.js', { 'etibingo:hostkey': 'eti-host' }, (js) => {
-  js = must(js, "const playUrl = location.origin + '/';", "const playUrl = 'POC: join on the phone panel';");
+  js = must(js, "const playUrl = location.origin + '/';", "const playUrl = 'Offline test: join on the phone panel';");
+  // No server in the offline file, so a phone can't join; show why instead of a QR that leads nowhere.
+  js = must(js, '<div class="qr">${window.qrcode ? qrSvg(playUrl) : \'\'}</div>',
+    '<div class="qr" style="display:grid;place-items:center;text-align:center;color:#00358A;font-weight:700;font-size:1.5vw;line-height:1.35">No QR in the offline test.<br>The real QR appears once the game is hosted.<br>Join on the phone panel &rarr;</div>');
   js = must(js, '<a href="/review" target="_blank">Review all squares</a> &middot; <a href="/tents" target="_blank">Print join QR cards</a> &middot; <a href="/host?stage=1" target="_blank">Stage-only view</a>',
     'The squares review, table tents and stage-only view are in the full app.');
   return js;
